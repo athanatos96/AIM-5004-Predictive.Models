@@ -1,0 +1,70 @@
+---
+title: "Week 2 Discussion"
+author: "Alex Parra"
+date: "30/5/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+
+```
+
+
+```{r}
+#https://www.kaggle.com/datasets/volpatto/temperature-timeseries-for-some-brazilian-cities?resource=download&select=station_sao_paulo.csv
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 2/station_sao_paulo.csv")
+
+inputdata
+```
+
+```{r}
+# Convert month columns into rows
+data <- reshape(inputdata, direction="long", varying=list(2:13), v.names=c("Val"), times = month.name, timevar = "Month")
+
+
+data$Date <- yearmonth(paste(data$YEAR, " ", data$Month))
+
+
+# There was 1 missing value. I input it the mean of the past and previous time step. (23+17.95)/2=20.475
+data %>%
+  select(Date, Val) %>% 
+  as_tsibble(index = Date) %>% 
+  filter(year(Date) >= 1990, Val !=999.90) %>%
+  fill_gaps(Val = as.integer(20.475)) -> data 	#median(Val)
+
+
+data
+
+autoplot(data, Val) +
+  labs(y = "Temperature (Celsius)",
+       title = "Temperature of Sao Paulo")
+```
+
+
+```{r}
+data %>%
+  model(
+    classical_decomposition(Val, type = "additive")
+  ) %>%
+  components() %>%
+  autoplot() +
+  labs(title = "Classical additive decomposition of Temperature of Sao Paulo")
+
+data %>%
+  model(
+    classical_decomposition(Val, type = "multiplicative")
+  ) %>%
+  components() %>%
+  autoplot() +
+  labs(title = "Classical multiplicative decomposition of Temperature of Sao Paulo")
+```
+

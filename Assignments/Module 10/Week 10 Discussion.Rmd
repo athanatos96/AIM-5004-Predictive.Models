@@ -1,0 +1,103 @@
+---
+title: "Week 10 Discussion"
+author: "Alex Parra"
+date: "27/7/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+```{r}
+# Data from: https://finance.yahoo.com/quote/AAPL/history?period1=1501113600&period2=1658880000&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true
+
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 10/AAPL.csv")
+
+# Convert Date column into Date format
+inputdata$Date <- yearmonth(inputdata$Date)
+
+# Convert df to tsibble format
+inputdata %>%
+  as_tsibble(index = Date)  -> inputdata 
+
+# Re-index based on trading days
+AAPL_Shares <- inputdata %>%
+  select(Date, Adj.Close)
+
+AAPL_Shares
+
+AAPL_Shares %>%
+  autoplot(Adj.Close) + labs(title='APPL')
+```
+
+```{r}
+# Data from: https://finance.yahoo.com/quote/GOOG/history?period1=1501113600&period2=1658880000&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true
+
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 10/GOOG.csv")
+
+# Convert Date column into Date format
+inputdata$Date <- yearmonth(inputdata$Date)
+
+# Convert df to tsibble format
+inputdata %>%
+  as_tsibble(index = Date)  -> inputdata 
+
+# Re-index based on trading days
+GOOG_Shares <- inputdata %>%
+  select(Date, Adj.Close)
+
+GOOG_Shares
+
+GOOG_Shares %>%
+  autoplot(Adj.Close) + labs(title='GOOG')
+```
+
+```{r}
+shares <- GOOG_Shares
+
+shares <- shares %>%
+  rename(GOOG = Adj.Close)
+
+# Convert Date column into Date format
+shares$AAPL <- AAPL_Shares$Adj.Close
+
+
+
+shares
+```
+
+
+```{r}
+fit <- shares %>%
+  model(
+    aicc = VAR(vars(GOOG, AAPL)),
+    bic = VAR(vars(GOOG, AAPL), ic = "bic")
+  )
+
+fit
+
+glance(fit)
+```
+
+```{r}
+fit %>%
+  augment() %>%
+  ACF(.innov) %>%
+  autoplot()
+```
+
+```{r}
+fit %>%
+  select(bic) %>%
+  forecast() %>%
+  autoplot(shares)
+```
+

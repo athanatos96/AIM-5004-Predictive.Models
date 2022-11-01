@@ -1,0 +1,112 @@
+---
+title: "Week 8 Discussion"
+author: "Alex Parra"
+date: "12/7/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+
+
+
+
+Import 
+```{r}
+# Data from: https://finance.yahoo.com/quote/SPY/history?period1=1499817600&period2=1656288000&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true
+
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 8/SPY.csv")
+
+# Convert Date column into Date format
+inputdata$Date <- date(inputdata$Date)
+
+# Convert df to tsibble format
+inputdata %>%
+  as_tsibble(index = Date)  -> inputdata 
+
+
+inputdata
+```
+
+
+```{r}
+# Re-index based on trading days
+SPY_Shares <- inputdata %>%
+  fill_gaps() %>%
+  tidyr::fill(Adj.Close, .direction = "down") %>%
+  select(Date, Adj.Close)
+  #mutate(Day = row_number()) #%>%
+  #update_tsibble(index = Day, regular = TRUE)
+
+SPY_Shares
+```
+
+
+```{r}
+SPY_Shares %>%
+  #update_tsibble(index = Date, regular = TRUE) %>%
+  autoplot(Adj.Close) +
+  labs(y = "Price $US", title = "SPDR S&P 500 ETF Trust Adj. Price",
+       subtitle = "(2017 - 2021)")
+```
+
+
+
+
+# Dynamic harmonic regression model.
+```{r}
+
+fit <- SPY_Shares %>%
+  model('K = 1' = ARIMA(log(Adj.Close) ~ fourier(K=1) + PDQ(0,0,0)),
+        'K = 2' = ARIMA(log(Adj.Close) ~ fourier(K=2) + PDQ(0,0,0)),
+        'K = 3' = ARIMA(log(Adj.Close) ~ fourier(K=3) + PDQ(0,0,0))
+        )
+
+
+fc <- fit %>%
+  forecast(h = 365)
+
+fc %>%
+  autoplot(SPY_Shares) +
+  labs(y="Price $US", title="SPDR S&P 500 ETF Trust Adj. Price", subtitle = "ARIMA non-seasonal model (2017 - 2021)")
+
+```
+
+
+
+cross-validation, evaluate the performance (against the typical metrics) 
+```{r}
+# Cross validation
+
+# Time series cross-validation accuracy
+SPY_Shares_tr <- SPY_Shares %>%
+  stretch_tsibble(.init = 1500, .step = 1) %>%
+  relocate(Date, .id)
+
+SPY_Shares_tr
+
+
+# Forecast
+SPY_Shares_Pred <- SPY_Shares_tr %>%
+  model('K = 1' = ARIMA(log(Adj.Close) ~ fourier(K=1) + PDQ(0,0,0)),
+        'K = 2' = ARIMA(log(Adj.Close) ~ fourier(K=2) + PDQ(0,0,0)),
+        'K = 3' = ARIMA(log(Adj.Close) ~ fourier(K=3) + PDQ(0,0,0))
+        ) %>%
+  forecast(h = 12)
+
+
+# TSCV accuracy
+SPY_Shares_Pred %>%
+  accuracy(SPY_Shares)
+```

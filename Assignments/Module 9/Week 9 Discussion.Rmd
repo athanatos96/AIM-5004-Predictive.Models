@@ -1,0 +1,155 @@
+---
+title: "Week 9 Discussion"
+author: "Alex Parra"
+date: "19/7/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+library(fabricatr)
+```
+
+```{r}
+# Number of years
+n_years= 20
+# Create dataset
+country_data <-
+  fabricate(
+    Country = add_level(
+      N = 1
+    ),
+    State = add_level(
+      N = 3
+    ),
+    County = add_level(
+      N = 3
+    ),
+    Date = add_level(
+      N=n_years,
+      shoe_sales = 10 + runif(N, min = 0, max = 1) + 3*seq(1, n_years, by=1)*runif(N, min = 1, max = 2)
+    )
+  ) %>% select(Date, Country, State, County, shoe_sales)
+country_data
+
+# Convert the year to the correct format
+years = as.numeric(country_data['Date'][,])
+country_data['Date'] = ((years-1) %% n_years) + 2000
+country_data
+
+```
+
+
+```{r}
+country_data %>% as_tsibble(index = Date, key = c(Country,State,County)) %>%
+  mutate(Country = recode(Country,
+    `1` = "Spain"
+  )) %>%
+  mutate(State = recode(State,
+    `1` = "Andalucia",
+    `2` = "Catalonia",
+    `3` = "Castille"
+  ))  %>%
+  mutate(County = recode(County,
+    `1` = "Seville",
+    `2` = "Granada",
+    `3` = "Cadiz",
+    `4` = "Barcelona",
+    `5` = "Tarragona",
+    `6` = "Gerona",
+    `7` = "Toledo",
+    `8` = "Leon",
+    `9` = "Burgos"
+  )) -> dataset_shoe
+
+dataset_shoe
+
+dataset_shoe %>%
+  autoplot(shoe_sales)
+
+```
+
+```{r}
+dataset_shoe_hts <- dataset_shoe %>%
+  aggregate_key(State / County, shoe_sales = sum(shoe_sales))
+dataset_shoe_hts
+```
+
+```{r}
+dataset_shoe_hts %>%
+  filter(is_aggregated(County)) %>%
+  autoplot(shoe_sales) +
+  labs(y = "Sales (Units)",
+       title = "shoe_sales: national and states") +
+  facet_wrap(vars(State), scales = "free_y", ncol = 2) +
+  theme(legend.position = "none")
+```
+
+
+```{r}
+dataset_shoe_hts %>%
+  autoplot(shoe_sales) +
+  facet_wrap(vars(County), scales = "free_y", ncol = 3)+
+  theme(legend.position = "none")
+```
+
+```{r}
+fit <- dataset_shoe_hts %>%
+  filter(Date<=2015) %>%
+  model(base = ETS(shoe_sales)) %>%
+  reconcile(
+    bu = bottom_up(base),
+    ols = min_trace(base, method = "ols"),
+    mint = min_trace(base, method = "mint_shrink"),
+  )
+
+fc <- fit %>% forecast(h = 5)
+
+
+```
+
+```{r}
+fc %>%
+  filter(is_aggregated(County)) %>%
+  autoplot(
+    dataset_shoe_hts ,
+    level = NULL
+  ) +
+  labs(y = "Sales (Units)") +
+  facet_wrap(vars(State), scales = "free_y")
+```
+
+```{r}
+fc %>%
+  autoplot(
+    dataset_shoe_hts ,
+    level = NULL
+  ) +
+  labs(y = "Sales (Units)") +
+  facet_wrap(vars(County), scales = "free_y")
+```
+
+```{r}
+fc %>%
+  filter(is_aggregated(State)) %>%
+  accuracy(dataset_shoe_hts)
+```
+
+
+
+```{r}
+fc %>%
+  filter(is_aggregated(State)) %>%
+  accuracy(data = dataset_shoe_hts,
+    measures = list(rmse = RMSE, mase = MASE))%>%
+  group_by(.model) %>%
+  summarise(rmse = mean(rmse), mase = mean(mase))
+```
+

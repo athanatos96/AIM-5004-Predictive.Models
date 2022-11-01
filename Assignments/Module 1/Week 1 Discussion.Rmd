@@ -1,0 +1,140 @@
+---
+title: "Week 1 Discussion"
+author: "Alex Parra"
+date: "24/5/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+```{r}
+y <- tsibble(
+  Year = 2015:2019,
+  Observation = c(123, 39, 78, 52, 110),
+  index = Year
+)
+```
+
+
+```{r}
+prison <- readr::read_csv("https://OTexts.com/fpp3/extrafiles/prison_population.csv")
+
+prison <- prison %>%
+  mutate(Quarter = yearquarter(Date)) %>%
+  select(-Date) %>%
+  as_tsibble(key = c(State, Gender, Legal, Indigenous),
+             index = Quarter)
+
+prison
+```
+
+
+```{r}
+PBS
+PBS %>%
+  filter(ATC2 == "A10")
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost)
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost))
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost)) %>%
+  mutate(Cost = TotalC/1e6)
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost)) %>%
+  mutate(Cost = TotalC / 1e6) -> a10
+```
+
+
+
+
+```{r}
+melsyd_economy <- ansett %>%
+  filter(Airports == "MEL-SYD", Class == "Economy") %>%
+  mutate(Passengers = Passengers/1000)
+
+
+autoplot(melsyd_economy, Passengers) +
+  labs(title = "Ansett airlines economy class",
+       subtitle = "Melbourne-Sydney",
+       y = "Passengers ('000)")
+```
+```{r}
+a10
+
+a10 %>%
+  select(Month, Cost)->a10
+a10
+```
+```{r}
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost)
+```
+```{r}
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost))
+```
+
+
+```{r}
+#library(ggplot2)
+library(tsibble)
+library(fpp3)
+library(forecast)
+library(ggfortify)
+
+
+PBS %>%
+  filter(ATC2 == "A10") %>%
+  select(Month, Concession, Type, Cost) %>%
+  summarise(TotalC = sum(Cost)) %>%
+  mutate(Cost = TotalC / 1e6) %>%
+  select(Month, Cost)->a10
+
+a10
+
+d.arima <- auto.arima(a10)
+d.forecast <- forecast(d.arima, level = c(95), h = 24)
+
+autoplot(d.forecast, ts.colour = 'red')+
+  labs(x = "Date",y = "$ (millions)",
+       title = "Australian antidiabetic drug sales",
+       subtitle = "Group by date, expressed in Millions. With 24 month forecast")
+```
+
+```{r}
+library(ggfortify)
+autoplot(AirPassengers)
+autoplot(AirPassengers, ts.colour = 'red', ts.linetype = 'dashed')
+AirPassengers
+ggcpgram(arima.sim(list(ar = c(0.7, -0.5)), n = 50))
+
+```
+
+
+
+
+

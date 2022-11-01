@@ -1,0 +1,99 @@
+---
+title: "Week 5 Discussion"
+author: "Alex Parra"
+date: "19/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+library(broom)
+```
+
+
+```{r}
+#https://www.kaggle.com/datasets/volpatto/temperature-timeseries-for-some-brazilian-cities?resource=download&select=station_sao_paulo.csv
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 2/station_sao_paulo.csv")
+
+inputdata
+```
+
+
+
+```{r}
+# Convert month columns into rows
+data <- reshape(inputdata, direction="long", varying=list(2:13), v.names=c("Val"), times = month.name, timevar = "Month")
+
+
+data$Date <- yearmonth(paste(data$YEAR, " ", data$Month))
+
+
+# There was 1 missing value. I input it the mean of the past and previous time step. (23+17.95)/2=20.475
+data %>%
+  select(Date, Val) %>% 
+  as_tsibble(index = Date) %>% 
+  filter(year(Date) >= 1990, Val !=999.90) %>%
+  fill_gaps(Val = as.integer(20.475)) -> Sao_Paulo_Temp_1990_2019 	#median(Val)
+
+
+Sao_Paulo_Temp_1990_2019
+
+autoplot(Sao_Paulo_Temp_1990_2019, Val) +
+  labs(y = "Temperature (Celsius)",
+       title = "Temperature of Sao Paulo")
+```
+
+
+```{r}
+Sao_Paulo_Temp_1990_2015 <- Sao_Paulo_Temp_1990_2019 %>%
+  filter(year(Date) <= 2015)
+
+fit_Temp <- Sao_Paulo_Temp_1990_2015 %>%
+  model(TSLM(Val ~ trend() + season()))
+
+
+# Predict
+fc_Temp <- fit_Temp %>%
+  forecast(h = 48)
+
+#Plot
+fc_Temp %>%
+  autoplot(Sao_Paulo_Temp_1990_2019,level = NULL, colour = 'red') +
+  labs(y = "Temp (Cº)",
+       title = "Temperature of Sao Paulo",
+       subtitle = "(1990 - 2019)") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+```
+
+
+
+
+```{r}
+# Cross validation
+
+# Time series cross-validation accuracy
+Sao_Paulo_Temp_1990_2019_tr <- Sao_Paulo_Temp_1990_2019 %>%
+  stretch_tsibble(.init = 240, .step = 1) %>%
+  relocate(Date, .id)
+
+
+Sao_Paulo_Temp_1990_2019_tr %>%
+  model(TSLM = TSLM(Val ~ trend() + season())) %>%
+  forecast(h = 24) -> Sao_Paulo_Pred
+Sao_Paulo_Pred
+# TSCV accuracy
+Sao_Paulo_Pred %>%
+  accuracy(Sao_Paulo_Temp_1990_2019)
+
+glance(fit_Temp) %>%
+  select(adj_r_squared, CV, AIC, AICc, BIC)
+```
+

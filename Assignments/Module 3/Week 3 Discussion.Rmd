@@ -1,0 +1,396 @@
+---
+title: "Week 3 Discussion"
+author: "Alex Parra"
+date: "8/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+
+```
+
+
+```{r}
+# Data from: https://finance.yahoo.com/quote/GLD/history?period1=1100736000&period2=1654646400&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true
+
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 3/GLD.csv")
+
+# Convert Date column into Date format
+inputdata$Date <- date(inputdata$Date)
+
+# Convert df to tsibble format
+inputdata %>%
+  as_tsibble(index = Date) -> inputdata 
+
+
+inputdata
+```
+
+
+
+
+```{r}
+
+# Re-index based on trading days
+GLD_Shares <- inputdata %>%
+  filter(year(Date) >= 2010) %>%
+  mutate(day = row_number()) %>%
+  update_tsibble(index = day, regular = TRUE)
+
+# Select only 2010's decade
+GLD_Shares_2010_2020 <- GLD_Shares %>% filter(year(Date) <= 2020)
+
+GLD_Shares_2010_2020
+```
+
+```{r}
+
+GLD_Shares_2010_2021 <- GLD_Shares %>%
+  filter(year(Date) >= 2010) %>%
+  filter(year(Date) <= 2021)
+#GLD_Shares_2010_2020 <- GLD_Shares_2010_2021 %>%
+#  filter(year(Date) <= 2020)
+
+GLD_Shares_fit <- GLD_Shares_2010_2020 %>%
+  model(
+    Mean = MEAN(Close),
+    `Naïve` = NAIVE(Close),
+    Drift = RW(Close ~ drift()),
+    LogTrans = RW(log(Close) ~ drift())
+  )
+
+GLD_Shares_fc <- GLD_Shares_fit %>%
+  forecast(h = 252)
+
+GLD_Shares_fc %>%
+  autoplot(GLD_Shares_2010_2021,level = NULL) +
+  labs(y = "$US",
+       title = "GLD shares daily closing prices",
+       subtitle = "(2010 - 2021)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+
+
+```{r}
+# Fit the models
+GLD_Shares_fit <- GLD_Shares_2010_2020 %>%
+  model(
+    Mean = MEAN(Close),
+    `Naïve` = NAIVE(Close),
+    Drift = NAIVE(Close ~ drift(),
+    LogTrans = RW(log(Close) ~ drift()))
+  )
+
+# Produce forecasts for 2021
+GLD_Shares_2021 <- GLD_Shares %>%
+  filter(year(Date) == 2021) 
+
+GLD_Shares_fc <- GLD_Shares_fit %>%
+    forecast(new_data = GLD_Shares_2021)
+
+# Plot the forecasts
+GLD_Shares_fc %>%
+  autoplot(GLD_Shares_2010_2020, level = NULL) +
+  autolayer(GLD_Shares_2021, Close, colour = "black") +
+  labs(y = "$US",
+       title = "GLD shares daily closing prices",
+       subtitle = "(2010 - 2021)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+```{r}
+GLD_Shares_2010_2020 %>%
+  model(NAIVE(Close)) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2020) +
+  labs(title="GLD shares daily closing prices, (Naïve forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+GLD_Shares_2010_2020 %>%
+  model(MEAN(Close)) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2020) +
+  labs(title="GLD shares daily closing prices, (Mean forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+GLD_Shares_2010_2020 %>%
+  model(NAIVE(Close ~ drift())) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2020) +
+  labs(title="GLD shares daily closing prices, (drift forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+```
+
+
+```{r}
+fit <- GLD_Shares_2010_2020 %>%
+  model(NAIVE(Close))
+fc <- fit %>% forecast(h = 252, bootstrap = TRUE)
+autoplot(fc, GLD_Shares_2010_2020) +
+  labs(title="GLD shares daily closing prices, bootstrap",
+       subtitle = "(2010 - 2021)", y="$US" )
+```
+
+
+
+
+
+```{r}
+GLD_Shares_2010_2020 %>%
+  model(RW(log(Close) ~ drift())) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2020,
+    point_forecast = lst(mean, median)
+  ) +
+  labs(title = "GLD shares daily closing prices, log transformation",
+       subtitle = "(2010 - 2021)",
+       y = "$US")
+```
+
+
+
+```{r}
+dcmp <- GLD_Shares_2010_2020 %>%
+  model(STL(Close ~ trend(window = 252), robust = TRUE)) %>%
+  components() %>%
+  select(-.model)
+
+dcmp %>%
+  model(NAIVE(season_adjust)) %>%
+  forecast() %>%
+  autoplot(dcmp) +
+  labs(y = "$US",
+       title = "GLD shares daily closing prices, decomposition")
+
+
+
+
+
+
+fit_dcmp <- GLD_Shares_2010_2020 %>%
+  model(stlf = decomposition_model(
+    STL(Close ~ trend(window = 252), robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+fit_dcmp %>%
+  forecast() %>%
+  autoplot(GLD_Shares_2010_2020)+
+  labs(y = "$US",
+       title = "GLD shares daily closing prices, decomposition")
+
+fit_dcmp %>% gg_tsresiduals()
+```
+
+
+
+
+
+```{r}
+
+GLD_Shares_2010_2021 <- GLD_Shares %>%
+  filter(year(Date) >= 2010) %>%
+  filter(year(Date) <= 2021)
+GLD_Shares_2010_2020 <- GLD_Shares_2010_2021 %>%
+  filter(year(Date) <= 2020)
+
+GLD_Shares_fit <- GLD_Shares_2010_2020 %>%
+  model(
+    Mean = MEAN(Close),
+    `Naïve` = NAIVE(Close),
+    Drift = RW(Close ~ drift()),
+    LogTrans = RW(log(Close) ~ drift())
+  )
+
+GLD_Shares_fc <- GLD_Shares_fit %>%
+  forecast(h = 252)
+
+GLD_Shares_fc %>%
+  autoplot(
+    GLD_Shares_2010_2021,
+    level = NULL
+  ) +
+  labs(
+    y = "$US",
+    title = "GLD shares daily closing prices, Evaluating point forecast accuracy"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+accuracy(GLD_Shares_fc, GLD_Shares_2010_2021)
+```
+
+
+
+
+
+```{r}
+# Cross validation
+
+# Time series cross-validation accuracy
+GLD_Shares_2010_2020_tr <- GLD_Shares_2010_2020 %>%
+  stretch_tsibble(.init = 252, .step = 126) %>%
+  relocate(Date, .id)
+GLD_Shares_2010_2020_tr
+
+
+
+
+
+# TSCV accuracy
+GLD_Shares_2010_2020_tr %>%
+  model(Mean = MEAN(Close),
+      `Naïve` = NAIVE(Close),
+      Drift = RW(Close ~ drift()),
+      LogTrans = RW(log(Close) ~ drift())) %>%
+  forecast(h = 252) %>%
+  accuracy(GLD_Shares_2010_2020)
+# Training set accuracy
+GLD_Shares_2010_2020 %>%
+  model(RW(Close ~ drift())) %>%
+  accuracy()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Compilation of the results: 
+
+
+
+```{r}
+# Data from: https://finance.yahoo.com/quote/GLD/history?period1=1100736000&period2=1654646400&interval=1d&filter=history&frequency=1d&includeAdjustedClose=true
+
+inputdata <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Week 3/GLD.csv")
+
+# Convert Date column into Date format
+inputdata$Date <- date(inputdata$Date)
+
+# Convert df to tsibble format
+inputdata %>%
+  as_tsibble(index = Date) -> inputdata 
+
+#inputdata
+
+
+# Re-index based on trading days
+GLD_Shares <- inputdata %>%
+  filter(year(Date) >= 2010) %>%
+  mutate(day = row_number()) %>%
+  update_tsibble(index = day, regular = TRUE)
+
+# Select only 2010's decade
+GLD_Shares_2010_2020 <- GLD_Shares %>% filter(year(Date) <= 2020)
+# Select 2010's decade + 1 year for forecast
+GLD_Shares_2010_2021 <- GLD_Shares %>% filter(year(Date) <= 2021)
+GLD_Shares_2010_2020
+#GLD_Shares_2010_2021
+
+
+
+# Build the models
+GLD_Shares_fit <- GLD_Shares_2010_2020 %>%
+  model(
+    Mean = MEAN(Close),
+    `Naïve` = NAIVE(Close),
+    Drift = RW(Close ~ drift()),
+    LogTrans = RW(log(Close) ~ drift())
+  )
+
+# Predict
+GLD_Shares_fc <- GLD_Shares_fit %>%
+  forecast(h = 252)
+
+#Plot
+GLD_Shares_fc %>%
+  autoplot(GLD_Shares_2010_2021,level = NULL) +
+  labs(y = "$US",
+       title = "GLD shares daily closing prices",
+       subtitle = "(2010 - 2021)") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+
+
+# Plot predictions intervals
+
+GLD_Shares_2010_2020 %>%
+  model(NAIVE(Close)) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2021) +
+  labs(title="GLD shares daily closing prices, (Naïve forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+GLD_Shares_2010_2020 %>%
+  model(MEAN(Close)) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2021) +
+  labs(title="GLD shares daily closing prices, (Mean forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+GLD_Shares_2010_2020 %>%
+  model(NAIVE(Close ~ drift())) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2021) +
+  labs(title="GLD shares daily closing prices, (drift forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+GLD_Shares_2010_2020 %>%
+  model(RW(log(Close) ~ drift())) %>%
+  forecast(h = 252) %>%
+  autoplot(GLD_Shares_2010_2021,point_forecast = lst(mean, median)) +
+  labs(title = "GLD shares daily closing prices, (log transformation forecast)",
+       subtitle = "(2010 - 2021)", y="$US" )
+
+
+# Get the metrics
+accuracy(GLD_Shares_fc, GLD_Shares_2010_2021)
+
+```
+
+```{r}
+# Cross validation
+
+# Time series cross-validation accuracy
+GLD_Shares_2010_2020_tr <- GLD_Shares_2010_2020 %>%
+  stretch_tsibble(.init = 252, .step = 126) %>%
+  relocate(Date, .id)
+GLD_Shares_2010_2020_tr
+
+
+
+# TSCV accuracy
+GLD_Shares_2010_2020_tr %>%
+  model(Mean = MEAN(Close),
+      `Naïve` = NAIVE(Close),
+      Drift = RW(Close ~ drift()),
+      LogTrans = RW(log(Close) ~ drift())) %>%
+  forecast(h = 252) %>%
+  accuracy(GLD_Shares_2010_2020)
+# Training set accuracy
+GLD_Shares_2010_2020 %>%
+  model(Mean = MEAN(Close),
+      `Naïve` = NAIVE(Close),
+      Drift = RW(Close ~ drift()),
+      LogTrans = RW(log(Close) ~ drift())) %>%
+  accuracy()
+```
