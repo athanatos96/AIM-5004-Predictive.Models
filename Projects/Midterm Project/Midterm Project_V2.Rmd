@@ -1,0 +1,712 @@
+---
+title: "Midterm Project"
+author: "Alex Parra"
+date: "22/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tsibble)
+library(fpp3)
+library(ResourceSelection)
+```
+
+
+# Import the datasets
+
+First the train dataset
+```{r}
+# Data from: https://www.kaggle.com/c/covid19-global-forecasting-week-5/data?select=submission.csv
+
+train <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Midterm Project/Data/train.csv")
+
+# Convert Date column into Date format
+train$Date <- date(train$Date)
+
+#Split by target
+#ConfirmedCases <- inputdata[inputdata$Target=='ConfirmedCases',]
+#Fatalities <- inputdata[inputdata$Target=='Fatalities',]
+
+# Remouved target column
+#ConfirmedCases <- select(ConfirmedCases, -Target)
+#Fatalities <- select(Fatalities, -Target)
+
+# change name of TargetValue column
+#colnames(ConfirmedCases)[which(names(ConfirmedCases) == "TargetValue")] <- "ConfirmedCases"
+#colnames(Fatalities)[which(names(Fatalities) == "TargetValue")] <- "Fatalities"
+
+# Join together the values as two different columns.
+#ConfirmedCases$Fatalities <- c(Fatalities$Fatalities)
+
+
+# Convert df to tsibble format
+train %>%
+  as_tsibble(index = Date, key = c(County, Province_State, Country_Region, Target)) -> train
+
+train
+
+
+```
+
+
+Second the test dataset
+```{r}
+# Data from: https://www.kaggle.com/c/covid19-global-forecasting-week-5/data?select=submission.csv
+
+test <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Midterm Project/Data/test.csv")
+
+# Convert Date column into Date format
+test$Date <- date(test$Date)
+
+# Convert df to tsibble format
+test %>%
+  as_tsibble(index = Date, key = c(County, Province_State, Country_Region, Target)) -> test
+
+test
+```
+
+And the submission dataset
+
+```{r}
+# Data from: https://www.kaggle.com/c/covid19-global-forecasting-week-5/data?select=submission.csv
+
+submission <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Midterm Project/Data/submission.csv")
+
+submission
+```
+
+
+
+
+
+
+# Explore the data
+
+## Country Names:
+```{r}
+#train 
+# get the names of countries, provinces and counties
+country_names = unique(train$Country_Region)
+print('---------------------------------------------------------------------------------------------------')
+print('country_names')
+print('---------------------------------------------------------------------------------------------------')
+print(country_names)
+
+```
+
+## Province Names:
+
+```{r}
+province_names = unique(train$Province_State)
+print('---------------------------------------------------------------------------------------------------')
+print('province_names')
+print('---------------------------------------------------------------------------------------------------')
+province_names
+
+```
+
+## counties Names:
+
+```{r}
+county_names = unique(train$County)
+print('---------------------------------------------------------------------------------------------------')
+print('county_names')
+print('---------------------------------------------------------------------------------------------------')
+county_names
+```
+
+## Provinces by country:
+
+We can see that only 8 countries have subdivisions in this dataset. 
+The country with the largest number of provinces is the US with 54, this is because it counts District of Columbia, Guam, Puerto Rico and the Virgin Islands.
+
+The second country with the most provinces in China with 33, followed by Canada with 12, France and the UK with 10, Australia with 8, the Netherlands with 4 and Denmark with 2
+
+```{r}
+countries_with_subdivisions = unique(duplicates(train %>% filter (Target == 'ConfirmedCases'), key = Country_Region, Date)$Country_Region)
+
+print('countries_with_subdivisions: ')
+
+countries_with_subdivisions
+print('---------------------------------------------------------------------------------------------------')
+for (country in countries_with_subdivisions) {
+  
+  # get only that country
+  province= train %>% filter (Country_Region == country)
+  
+  count = length(unique(province$Province_State)) -1
+  
+  # print country name + number of province
+  print(paste(country, ' (', count, ')' ))
+  
+  # print proviences names
+  print(unique(province$Province_State))
+  print('---------------------------------------------------------------------------------------------------')
+}
+```
+
+
+
+## Counties by province:
+Here we can see the complete list of all the provinces with their respective counties. In this case all the provinces belong to the US and we see that in this case Guam, Puerto Rico and the Virgin Islands do not have subdivisions
+```{r}
+provinces_with_subdivisions = unique(duplicates(train %>% filter (Target == 'ConfirmedCases'), key = Province_State, Date)$Province_State)
+
+print( paste('provinces_with_subdivisions: (', length(provinces_with_subdivisions)-1 ,')'))
+
+provinces_with_subdivisions
+print('---------------------------------------------------------------------------------------------------')
+for (province in provinces_with_subdivisions[-1]) {
+  
+  # get only that province
+  county= train %>% filter (Province_State == province)
+  
+  count = length(unique(county$County)) -1
+  
+  # print province name + number of province
+  print(paste(province, ' (', count, ')' ))
+  
+  # print proviences names
+  print(unique(county$County))
+  print('---------------------------------------------------------------------------------------------------')
+}
+```
+
+
+
+
+
+## Plot some countries
+```{r}
+#train
+train %>% 
+  filter(Country_Region == 'US'| Country_Region == 'Canada'| Country_Region == 'Italy'| Country_Region == 'Germany') %>%
+  filter(Province_State== '') %>%
+  select(Date, Target, Country_Region, TargetValue) -> data #, Province_State
+
+# list of countries explored
+country_list = c('US', 'Canada', 'Italy', 'Germany')
+
+# Graphs
+autoplot(data %>% 
+  filter(Country_Region == 'US'))
+
+autoplot(data %>% 
+  filter(Country_Region == 'Canada'))
+
+autoplot(data %>% 
+  filter(Country_Region == 'Italy'))
+
+autoplot(data %>% 
+  filter(Country_Region == 'Germany'))
+
+# Boxplot 
+boxplot(TargetValue~Target, data=data %>% filter(Country_Region == 'US'), main="US",
+   xlab="Target", ylab="TargetValue")#Country_Region
+
+boxplot(TargetValue~Target, data=data %>% filter(Country_Region == 'Canada'), main="Canada",
+   xlab="Target", ylab="TargetValue")#Country_Region
+
+boxplot(TargetValue~Target, data=data %>% filter(Country_Region == 'Italy'), main="Italy",
+   xlab="Target", ylab="TargetValue")#Country_Region
+
+boxplot(TargetValue~Target, data=data %>% filter(Country_Region == 'Germany'), main="Germany",
+   xlab="Target", ylab="TargetValue")#Country_Region
+
+# Histograms
+for (cc in country_list) {
+  data %>% filter(Country_Region == cc) -> dd
+  
+  dd %>% filter(Target == "ConfirmedCases") -> confirmed_Cases 
+  dd %>% filter(Target == "Fatalities") -> fatalities 
+  
+  par(mfrow=c(2,1))
+  hist(confirmed_Cases$TargetValue, main = paste0(cc,' confirmed_Cases')) 
+  hist(fatalities$TargetValue, main = paste0(cc,' fatalities'))
+}
+```
+
+```{r}
+# Filter
+train %>% 
+  filter(Country_Region == 'US'| Country_Region == 'Canada'| Country_Region == 'Italy'| Country_Region == 'Germany') %>%
+  filter(Province_State== '')  %>%
+  mutate(Target = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1)) %>%
+  as_tsibble(index = Date, key = Weight ) %>% 
+  select(Date, Population, Weight, Target, TargetValue) -> data_US_Canada_Italy_Germany
+
+data_US_Canada_Italy_Germany
+
+kdepairs(data_US_Canada_Italy_Germany)
+
+
+train %>%
+  filter(Province_State== '')%>% 
+  mutate(Target = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1)) %>%
+  as_tsibble(index = Date, key = Weight ) %>% 
+  select(Date, Population, Weight, Target, TargetValue) -> data_whole_world
+
+data_whole_world
+
+kdepairs(data_whole_world)
+
+
+train %>%
+  filter(County== '')%>% 
+  mutate(Target = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1)) %>%
+  #as_tsibble(index = Date, key = Weight ) %>% 
+  select(Date, Population, Weight, Target, TargetValue) -> data_whole_world_with_provinces
+
+data_whole_world_with_provinces[,1:5]
+
+kdepairs(data_whole_world_with_provinces[,1:5])
+```
+
+
+
+```{r}
+data_US_Canada_Italy_Germany %>%
+  GGally::ggpairs() + labs(title = "US Canada Italy and Germany")
+
+data_whole_world %>%
+  GGally::ggpairs() + labs(title = "Whole World")
+
+data_whole_world_with_provinces %>%
+  GGally::ggpairs(columns = 1:5) + labs(title = "Whole World with provinces")
+```
+
+
+
+
+# Models
+
+## Basic models
+using only original information, without any outside datasets
+
+### US, Canada, Italy, Germany
+only for those 4 countries
+```{r}
+train %>% 
+  filter(Country_Region == 'US'| Country_Region == 'Canada'| Country_Region == 'Italy'| Country_Region == 'Germany') %>%
+  
+  filter(Province_State== '')  %>%
+  
+  mutate_at(.vars = 'TargetValue', .funs = list(~ ifelse(TargetValue < 0, 0, .))) %>% # Convert negative values to 0
+  
+  mutate(Target_num = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1),
+    TargetValue_cumulative = cumsum(TargetValue), # Get a column of cumulative values
+    PandemicStart = case_when(
+    TargetValue_cumulative!=0 ~ 1,
+    TargetValue_cumulative==0 ~ 0)# Column indicating the start of the pandemic
+    ) %>%
+  
+  select(Date, County, Province_State, Country_Region, Population, Weight, Target, Target_num, PandemicStart, TargetValue_cumulative, TargetValue) -> data_train
+
+#data_train$TargetValue <- as.integer(data_train$TargetValue)
+data_train$TargetValue <- as.double(data_train$TargetValue)
+#as.double()
+
+data_train
+```
+
+```{r}
+data_train %>% 
+  select(Date, Population, Weight, Target_num, PandemicStart,TargetValue_cumulative, TargetValue) %>%
+  GGally::ggpairs(columns = 1:7)
+```
+
+Build models:
+
+  TargetValue ~ Trend + season
+  TargetValue ~ Trend + season + Weight
+
+  TargetValue ~ lag(TargetValue)
+  TargetValue ~ Trend + lag(TargetValue)
+  TargetValue ~ Season + lag(TargetValue)
+  TargetValue ~ Trend + season + lag(TargetValue)
+
+  TargetValue ~ Trend + season + PandemicStart
+  TargetValue ~ Trend + season + PandemicStart + lag(TargetValue)
+
+  log(TargetValue) ~ Trend + season + lag(log(TargetValue))
+  log(TargetValue) ~ Trend + season + PandemicStart + lag(log(TargetValue))
+  
+```{r}
+# get around 80% to train, rest 20% to validate
+data_train %>% 
+  filter( Date <'2020-05-14' ) -> data_train_split80
+
+#data_train_split80 %>% filter(TargetValue<=0)
+
+fit_model <- data_train_split80 %>%
+  model(
+        ts = TSLM(TargetValue ~ trend() + season()),
+        
+        tsw = TSLM(TargetValue ~ trend() + season() + Weight),
+        
+        l1 = TSLM(TargetValue ~ lag(TargetValue, n=1)),
+        l2 = TSLM(TargetValue ~ lag(TargetValue, n=2)),
+        l4 = TSLM(TargetValue ~ lag(TargetValue, n=4)),
+        l6 = TSLM(TargetValue ~ lag(TargetValue, n=6)),
+        l8 = TSLM(TargetValue ~ lag(TargetValue, n=8)),
+        
+        tl1 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=1)),
+        tl2 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=2)),
+        tl4 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=4)),
+        tl6 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=6)),
+        tl8 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=8)),
+        
+        sl1 = TSLM(TargetValue ~ season() + lag(TargetValue, n=1)),
+        sl2 = TSLM(TargetValue ~ season() + lag(TargetValue, n=2)),
+        sl4 = TSLM(TargetValue ~ season() + lag(TargetValue, n=4)),
+        sl6 = TSLM(TargetValue ~ season() + lag(TargetValue, n=6)),
+        sl8 = TSLM(TargetValue ~ season() + lag(TargetValue, n=8)),
+        
+        tsl1 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=1)),
+        tsl2 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=2)),
+        tsl4 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=4)),
+        tsl6 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=6)),
+        tsl8 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=8)),
+        
+        tsS = TSLM(TargetValue ~ trend() + season() + PandemicStart),
+        
+        tsSl1 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=1)),
+        tsSl2 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=2)),
+        tsSl4 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=4)),
+        tsSl6 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=6)),
+        tsSl8 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=8)),
+        
+        log_tsl1 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=1)),
+        log_tsl2 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=2)),
+        log_tsl4 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=4)),
+        log_tsl6 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=6)),
+        
+        log_tsSl1 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=1)),
+        log_tsSl2 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=2)),
+        log_tsSl4 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=4)),
+        log_tsSl6 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=6))
+        
+        ) 
+
+fit_model
+
+
+
+# Make forecast
+forecast(fit_model, data_train) -> data_Pred
+data_Pred
+```
+
+
+
+```{r}
+# TSCV accuracy
+data_Pred %>%
+  accuracy(data_train) %>%
+  group_by(.model,Target) %>%   summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_US_Canada_Italy_Germany
+accuracy_US_Canada_Italy_Germany
+
+data_Pred %>%
+  accuracy(data_train) %>%
+  group_by(.model) %>%   summarize(
+    avg_ACF1 = mean(ACF1),
+    ) %>%
+  arrange(avg_ACF1)
+
+glance(fit_model) %>%
+  group_by(.model,Target) %>% 
+  summarize(
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    avg_AICc = mean(AICc),
+    avg_BIC = mean(BIC),
+    ) %>%
+  arrange(desc(avg_adj_r_squared)) -> glance_US_Canada_Italy_Germany
+glance_US_Canada_Italy_Germany
+  
+```
+
+
+```{r}
+data_Pred %>%
+  filter(Country_Region == 'US' & Target == 'ConfirmedCases') %>%
+  filter(.model == "l1" | .model == "sl1" | .model == "tl1" | .model == "tsl1" | .model == "log_tsl1") %>%
+  autoplot(data_train_US,level = NULL, colour = 'red') +
+  labs(y = "Cases",
+       title = "Confirmed Cases for USA",
+       subtitle = "(2020/01/23 - 2020/06/10)") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+data_Pred %>%
+  filter(Country_Region == 'US' & Target == 'Fatalities') %>%
+  filter(.model == "l1" | .model == "sl1" | .model == "tl1" | .model == "tsl1" | .model == "log_tsl1") %>%
+  autoplot(data_train_US,level = NULL, colour = 'red') +
+  labs(y = "Cases",
+       title = "Fatalities for USA",
+       subtitle = "(2020/01/23 - 2020/06/10)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+
+
+### All countries
+Only for the countries
+Now lets run the previous models on the hole globe, and see the results, not only on 4 countries (In this case, ignoring the provinces and counties, only countries)
+
+```{r}
+train %>% 
+  filter(Province_State== '')  %>%
+  
+  mutate_at(.vars = 'TargetValue', .funs = list(~ ifelse(TargetValue < 0, 0, .))) %>% # Convert negative values to 0
+  
+  mutate(Target_num = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1),
+    TargetValue_cumulative = cumsum(TargetValue), # Get a column of cumulative values
+    PandemicStart = case_when(
+    TargetValue_cumulative!=0 ~ 1,
+    TargetValue_cumulative==0 ~ 0)# Column indicating the start of the pandemic
+    ) %>%
+  
+  select(Date, County, Province_State, Country_Region, Population, Weight, Target, Target_num, PandemicStart, TargetValue_cumulative, TargetValue) -> data_train_whole_glove
+
+#data_train$TargetValue <- as.integer(data_train$TargetValue)
+data_train_whole_glove$TargetValue <- as.double(data_train_whole_glove$TargetValue)
+#as.double()
+
+data_train_whole_glove
+
+# Get correlations
+data_train_whole_glove %>% 
+  select(Date, Population, Weight, Target_num, PandemicStart,TargetValue_cumulative, TargetValue) %>%
+  GGally::ggpairs(columns = 1:7)
+```
+
+
+```{r}
+# get around 80% to train, rest 20% to validate
+data_train_whole_glove %>% 
+  filter( Date <'2020-05-14' ) -> data_train_whole_glove_split80
+
+
+
+fit_model_whole_glove <- data_train_whole_glove_split80 %>%
+  model(
+        ts = TSLM(TargetValue ~ trend() + season()),
+        
+        tsw = TSLM(TargetValue ~ trend() + season() + Weight),
+        
+        l1 = TSLM(TargetValue ~ lag(TargetValue, n=1)),
+        l2 = TSLM(TargetValue ~ lag(TargetValue, n=2)),
+        l4 = TSLM(TargetValue ~ lag(TargetValue, n=4)),
+        l6 = TSLM(TargetValue ~ lag(TargetValue, n=6)),
+        l8 = TSLM(TargetValue ~ lag(TargetValue, n=8)),
+        
+        tl1 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=1)),
+        tl2 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=2)),
+        tl4 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=4)),
+        tl6 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=6)),
+        tl8 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=8)),
+        
+        sl1 = TSLM(TargetValue ~ season() + lag(TargetValue, n=1)),
+        sl2 = TSLM(TargetValue ~ season() + lag(TargetValue, n=2)),
+        sl4 = TSLM(TargetValue ~ season() + lag(TargetValue, n=4)),
+        sl6 = TSLM(TargetValue ~ season() + lag(TargetValue, n=6)),
+        sl8 = TSLM(TargetValue ~ season() + lag(TargetValue, n=8)),
+        
+        tsl1 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=1)),
+        tsl2 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=2)),
+        tsl4 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=4)),
+        tsl6 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=6)),
+        tsl8 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=8)),
+        
+        tsS = TSLM(TargetValue ~ trend() + season() + PandemicStart),
+        
+        tsSl1 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=1)),
+        tsSl2 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=2)),
+        tsSl4 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=4)),
+        tsSl6 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=6)),
+        tsSl8 = TSLM(TargetValue ~ trend() + season() + PandemicStart + lag(TargetValue, n=8)),
+        
+        log_tsl1 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=1)),
+        log_tsl2 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=2)),
+        log_tsl4 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=4)),
+        log_tsl6 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=6)),
+        
+        log_tsSl1 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=1)),
+        log_tsSl2 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=2)),
+        log_tsSl4 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=4)),
+        log_tsSl6 = TSLM(log1p(TargetValue) ~ trend() + season() + PandemicStart + lag(log1p(TargetValue), n=6))
+        
+        ) 
+
+fit_model_whole_glove
+
+
+
+# Make forecast
+forecast(fit_model_whole_glove, data_train_whole_glove) -> data_Pred_whole_glove
+data_Pred_whole_glove
+```
+
+```{r}
+# TSCV accuracy
+data_Pred_whole_glove %>%
+  accuracy(data_train_whole_glove) %>%
+  group_by(.model,Target) %>%   summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_whole_glove
+accuracy_whole_glove
+
+data_Pred_whole_glove %>%
+  accuracy(data_train_whole_glove) %>%
+  group_by(.model) %>%   summarize(
+    avg_ACF1 = mean(ACF1),
+    ) %>%
+  arrange(avg_ACF1)
+
+glance(fit_model_whole_glove) %>%
+  group_by(.model,Target) %>% 
+  summarize(
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    avg_AICc = mean(AICc),
+    avg_BIC = mean(BIC),
+    ) %>%
+  arrange(desc(avg_adj_r_squared)) -> glance_whole_glove
+glance_whole_glove
+  
+```
+
+
+
+
+
+
+### All Dataset
+Only for the countries
+Now lets run the previous models on the hole globe, and see the results (In this case, including the provinces and counties), in this case we only run a couple of models and not all, this is done in order to increase excetution time:
+```{r}
+train %>% 
+  mutate_at(.vars = 'TargetValue', .funs = list(~ ifelse(TargetValue < 0, 0, .))) %>% # Convert negative values to 0
+  
+  mutate(Target_num = case_when(
+    Target=='ConfirmedCases' ~ 0,
+    Target=='Fatalities' ~ 1),
+    TargetValue_cumulative = cumsum(TargetValue), # Get a column of cumulative values
+    PandemicStart = case_when(
+    TargetValue_cumulative!=0 ~ 1,
+    TargetValue_cumulative==0 ~ 0)# Column indicating the start of the pandemic
+    ) %>%
+  
+  select(Date, County, Province_State, Country_Region, Population, Weight, Target, Target_num, PandemicStart, TargetValue_cumulative, TargetValue) -> data_train_whole_glove_with_provincies_counties
+
+#data_train$TargetValue <- as.integer(data_train$TargetValue)
+data_train_whole_glove_with_provincies_counties$TargetValue <- as.double(data_train_whole_glove_with_provincies_counties$TargetValue)
+#as.double()
+
+#data_train_whole_glove_with_provincies_counties
+
+```
+
+
+
+```{r}
+# get around 80% to train, rest 20% to validate
+data_train_whole_glove_with_provincies_counties %>% 
+  filter( Date <'2020-05-14' ) -> data_train_whole_glove_with_provincies_counties_split80
+
+
+
+fit_model_whole_glove_with_provincies_counties <- data_train_whole_glove_with_provincies_counties_split80 %>%
+  model(
+        #tl1 = TSLM(TargetValue ~ trend() + lag(TargetValue, n=1)),
+        
+        #sl1 = TSLM(TargetValue ~ season() + lag(TargetValue, n=1)),
+        
+        tsl1 = TSLM(TargetValue ~ trend() + season() + lag(TargetValue, n=1)),
+        
+        #log_tsl1 = TSLM(log1p(TargetValue) ~ trend() + season() + lag(log1p(TargetValue), n=1))
+        ) 
+
+fit_model_whole_glove_with_provincies_counties
+
+
+
+# Make forecast
+forecast(fit_model_whole_glove_with_provincies_counties, data_train_whole_glove_with_provincies_counties) -> data_Pred_whole_glove_with_provincies_counties
+#data_Pred_whole_glove_with_provincies_counties
+```
+
+```{r}
+# TSCV accuracy
+data_Pred_whole_glove_with_provincies_counties %>%
+  accuracy(data_train_whole_glove_with_provincies_counties) %>%
+  group_by(.model,Target) %>%   summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_whole_glove_with_provincies_counties
+accuracy_whole_glove_with_provincies_counties
+
+data_Pred_whole_glove_with_provincies_counties %>%
+  accuracy(data_train_whole_glove_with_provincies_counties) %>%
+  group_by(.model) %>%   summarize(
+    avg_ACF1 = mean(ACF1),
+    ) %>%
+  arrange(avg_ACF1)
+
+glance(fit_model_whole_glove_with_provincies_counties) %>%
+  group_by(.model,Target) %>% 
+  summarize(
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    avg_AICc = mean(AICc),
+    avg_BIC = mean(BIC),
+    ) %>%
+  arrange(desc(avg_adj_r_squared)) -> glance_whole_glove_with_provincies_counties
+glance_whole_glove_with_provincies_counties
+```
+
+
+
+
