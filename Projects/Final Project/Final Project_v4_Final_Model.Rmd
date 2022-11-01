@@ -1,0 +1,145 @@
+---
+title: "Final Project_v4_Final_Model"
+author: "Alex Parra"
+date: "10/8/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+# Import the datasets
+
+
+```{r}
+final_dataset <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/final_dataset.csv")
+final_dataset
+
+
+sample_submission <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/sample_submission.csv")
+sample_submission
+```
+
+# Convert to tsibble
+
+```{r}
+################################
+#####  sample_submission   #####  
+################################
+sample_submission_2 = separate(data = sample_submission, col = id, into = c("air", "id", "date"), sep = "_")
+
+sample_submission$air_store_id = paste(sample_submission_2$air,sample_submission_2$id,sep="_")
+sample_submission$date = date(sample_submission_2$date)
+sample_submission
+
+sample_submission %>%
+  as_tsibble(date, key=air_store_id) %>% 
+  select(date, air_store_id, id, visitors) -> sample_submission
+sample_submission
+```
+
+
+
+```{r}
+############################
+#####  final_dataset   #####  
+############################
+final_dataset2 = final_dataset
+final_dataset2$date = date(final_dataset2$date)
+
+final_dataset2 %>%
+  as_tsibble(date, key = air_store_id) %>%
+  select(date, air_store_id, id, visitors, day_of_week, holiday_flg, air_reserve_visitors, hpg_reserve_visitors, total_reserve, air_genre_name, na_val, na_val_cumulative) -> final_dataset2
+final_dataset2
+```
+
+
+# Split the dataset
+
+```{r}
+final_dataset2 %>%
+  filter(date<= date('2017-04-22')) -> train2
+
+final_dataset2 %>%
+  filter(date > date('2017-04-22')) -> test
+
+train2
+test
+```
+
+
+
+
+
+
+```{r}
+fit <- train2 %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    'arima_dh' = ARIMA(visitors ~ day_of_week + holiday_flg), 
+    'arima_dhTR' = ARIMA(visitors ~ day_of_week + holiday_flg + total_reserve),
+    )
+fit
+```
+
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test) # train2
+
+prediction
+```
+
+
+# Convert the df to a csv.
+
+## arima + day of week + holiday_flg
+```{r}
+prediction %>%
+  filter(.model == "arima_dh") %>% 
+  as_tibble() %>%
+  select(id, .mean) -> arima_dh_final
+rename(arima_dh_final, visitors = .mean) -> arima_dh_final
+
+arima_dh_final
+```
+```{r}
+write.csv(arima_dh_final, "D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/arima_dh_prediction.csv", row.names = FALSE, quote=FALSE)
+```
+
+
+
+
+
+
+## arima + day of week + holiday_flg + Total Reserves
+```{r}
+prediction %>%
+  filter(.model == "arima_dhTR") %>% 
+  as_tibble() %>%
+  select(id, .mean) -> arima_dhTR_final
+rename(arima_dhTR_final, visitors = .mean) -> arima_dhTR_final
+
+arima_dhTR_final
+```
+
+
+```{r}
+write.csv(arima_dhTR_final, "D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/arima_dhTR_prediction.csv", row.names = FALSE, quote=FALSE)
+```
+
+
+
+
+
+
+

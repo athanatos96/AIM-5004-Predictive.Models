@@ -1,0 +1,269 @@
+---
+title: "Final Project_v4_Models_performance"
+author: "Alex Parra"
+date: "9/8/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+# Import the datasets
+
+
+```{r}
+final_dataset <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/final_dataset.csv")
+final_dataset
+
+
+sample_submission <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/sample_submission.csv")
+sample_submission
+```
+
+# Convert to tsibble
+
+```{r}
+################################
+#####  sample_submission   #####  
+################################
+sample_submission_2 = separate(data = sample_submission, col = id, into = c("air", "id", "date"), sep = "_")
+
+sample_submission$air_store_id = paste(sample_submission_2$air,sample_submission_2$id,sep="_")
+sample_submission$date = date(sample_submission_2$date)
+sample_submission
+
+sample_submission %>%
+  as_tsibble(date, key=air_store_id) %>% 
+  select(date, air_store_id, id, visitors) -> sample_submission
+sample_submission
+```
+
+
+
+```{r}
+############################
+#####  final_dataset   #####  
+############################
+final_dataset2 = final_dataset
+final_dataset2$date = date(final_dataset2$date)
+
+final_dataset2 %>%
+  as_tsibble(date, key = air_store_id) %>%
+  select(date, air_store_id, id, visitors, day_of_week, holiday_flg, air_reserve_visitors, hpg_reserve_visitors, total_reserve, air_genre_name, na_val, na_val_cumulative) -> final_dataset2
+final_dataset2
+```
+
+
+# Split the dataset
+
+```{r}
+final_dataset2 %>%
+  filter(date<= date('2017-04-22')) -> train2
+train2
+```
+
+```{r}
+train2 %>% 
+  filter(date <= date('2017-03-05')) -> train_set
+train2 %>% 
+  filter(date > date('2017-03-05')) -> test_set
+length(unique(train2$date))
+length(unique(train_set$date))
+length(unique(test_set$date))
+
+```
+
+# Build the model
+
+## Build the TSLM models
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    # Normal model Trend + season
+    ts = TSLM(visitors ~ trend() + season()),
+    # Include Treand season day of week and holiday flag
+    tsdh = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg),
+    
+    # Include reservations
+    tsTR = TSLM(visitors ~ trend() + season() + total_reserve),
+    
+    # Include the genre
+    tsg = TSLM(visitors ~ trend() + season() + air_genre_name),
+
+    # Include Null count
+    tsn = TSLM(visitors ~ trend() + season() + na_val),
+    tsNC = TSLM(visitors ~ trend() + season() + na_val_cumulative),
+    
+    
+    tsdhARHRTRnNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + na_val + na_val_cumulative),
+    
+    )
+fit
+```
+
+
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_TSLM
+accuracy_TSLM
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    ) %>%
+  #arrange(desc(avg_adj_r_squared)) -> glance_TSLM
+  arrange(avg_BIC) -> glance_TSLM
+glance_TSLM
+```
+
+## Build the ARIMA models
+
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    'arima' = ARIMA(visitors),#, stepwise = FALSE, approx = FALSE
+    'arima_TR' = ARIMA(visitors ~ total_reserve),#, stepwise = FALSE, approx = FALSE
+    'arima_dh' = ARIMA(visitors ~ day_of_week + holiday_flg), #, stepwise = FALSE, approx = FALSE
+    'arima_dhTR' = ARIMA(visitors ~ day_of_week + holiday_flg + total_reserve),#, stepwise = FALSE, approx = FALSE
+    )
+fit
+```
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_ARIMA
+accuracy_ARIMA
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_AIC = mean(AIC),
+    avg_sigma2 = mean(sigma2),
+    ) %>%
+  arrange(avg_BIC) -> glance_ARIMA
+glance_ARIMA
+```
+
+
+
+## Build the Dynamic Harmonic regression models
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    'K = 1' = ARIMA(visitors ~ fourier(K=1)),
+    'K = 2' = ARIMA(visitors ~ fourier(K=2)),
+    'K = 3' = ARIMA(visitors ~ fourier(K=3)),
+    )
+fit
+
+#report(fit)
+#report(fit %>% filter(air_store_id =='air_0241aa3964b7f861'))
+```
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_DyHarRe
+accuracy_DyHarRe
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_AIC = mean(AIC),
+    avg_sigma2 = mean(sigma2),
+    ) %>%
+  arrange(avg_BIC) -> glance_DyHarRe
+glance_DyHarRe
+```
+

@@ -1,0 +1,1038 @@
+---
+title: "Final Project_v3"
+author: "Alex Parra"
+date: "8/8/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+library(ResourceSelection)
+```
+
+
+
+# Import the datasets
+
+
+```{r}
+hpg_reserve <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/hpg_reserve.csv")
+hpg_reserve
+
+hpg_store_info <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/hpg_store_info.csv")
+hpg_store_info
+
+air_reserve <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/air_reserve.csv")
+air_reserve
+
+air_store_info <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/air_store_info.csv")
+air_store_info
+
+air_visit_data <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/air_visit_data.csv")
+air_visit_data
+
+store_id_relation <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/store_id_relation.csv")
+store_id_relation
+
+
+
+date_info <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/date_info.csv")
+date_info
+
+sample_submission <- read.csv("D:/Personal/Alex/Uni/MS IA/2 Curso/Summer 2022/Predictive Models/Assignments/Final Project/Data/recruit-restaurant-visitor-forecasting/sample_submission.csv")
+sample_submission
+```
+
+
+
+
+# Convert to tsibble
+
+```{r}
+################################
+#####  sample_submission   #####  
+################################
+sample_submission_2 = separate(data = sample_submission, col = id, into = c("air", "id", "date"), sep = "_")
+
+sample_submission$air_store_id = paste(sample_submission_2$air,sample_submission_2$id,sep="_")
+sample_submission$date = date(sample_submission_2$date)
+sample_submission
+
+sample_submission %>%
+  as_tsibble(date, key=air_store_id) %>% 
+  select(date, air_store_id, id, visitors) -> sample_submission
+sample_submission
+```
+
+
+
+
+
+```{r}
+########################
+#####  date_info   #####  
+########################
+date_info$date = date(date_info$calendar_date)
+date_info %>%
+  as_tsibble(index = date ) %>% 
+  select(date,day_of_week,holiday_flg)-> date_info
+date_info
+```
+
+```{r}
+################################
+#####  store_id_relation   #####  
+################################
+store_id_relation
+```
+
+
+
+
+```{r}
+#############################
+#####  air_visit_data   #####  
+#############################
+air_visit_data$date = date(air_visit_data$visit_date)
+air_visit_data %>%
+  as_tsibble(date, key=air_store_id) %>%
+  select(date, air_store_id, visitors)-> air_visit_data
+air_visit_data
+```
+
+```{r}
+#############################
+#####  air_store_info   #####  
+#############################
+air_store_info #This one doesn’t gets converted to tsibble as it doesn’t have a date column
+
+#############################
+#####  hpg_store_info   #####  
+#############################
+hpg_store_info #This one doesn’t gets converted to tsibble as it doesn’t have a date column
+```
+
+
+
+
+```{r}
+##########################
+#####  air_reserve   #####  
+##########################
+air_reserve$date = date(air_reserve$visit_datetime)
+air_reserve$reserve_date = date(air_reserve$reserve_datetime)
+air_reserve %>% 
+  group_by(air_store_id, date) %>% 
+  summarise(reserve_visitors = sum(reserve_visitors)) %>%
+  as_tsibble(date, key=air_store_id) %>%
+  select(date, air_store_id, reserve_visitors) -> air_reserve
+air_reserve
+```
+
+```{r}
+##########################
+#####  hpg_reserve   #####  
+##########################
+hpg_reserve$date = date(hpg_reserve$visit_datetime)
+hpg_reserve$reserve_date = date(hpg_reserve$reserve_datetime)
+hpg_reserve %>% 
+  group_by(hpg_store_id, date) %>% 
+  summarise(reserve_visitors = sum(reserve_visitors)) %>%
+  as_tsibble(date, key=hpg_store_id) %>%
+  select(date, hpg_store_id, reserve_visitors) -> hpg_reserve
+hpg_reserve
+```
+
+
+
+# Check dimensions
+
+```{r}
+########################
+#####  date_info   #####  
+########################
+#date_info
+# Number of days
+length(unique(date_info$date))
+```
+```{r}
+#############################
+#####  air_visit_data   #####  
+#############################
+#air_visit_data
+# Number of diferent stores
+length(unique(air_visit_data$air_store_id))
+# Number of days
+length(unique(air_visit_data$date))
+#air_visit_data
+```
+```{r}
+#############################
+#####  air_store_info   #####  
+#############################
+#air_store_info
+# Number of diferent stores
+length(unique(air_store_info$air_store_id))
+
+```
+```{r}
+#############################
+#####  hpg_store_info   #####  
+#############################
+#hpg_store_info
+# Number of diferent stores
+length(unique(hpg_store_info$hpg_store_id))
+```
+```{r}
+##########################
+#####  air_reserve   #####  
+##########################
+#air_reserve
+# Number of diferent stores
+length(unique(air_reserve$air_store_id))
+# Number of days
+length(unique(air_reserve$date))
+#air_visit_data
+```
+```{r}
+##########################
+#####  hpg_reserve   #####  
+##########################
+#hpg_reserve
+# Number of diferent stores
+length(unique(hpg_reserve$hpg_store_id))
+# Number of days
+length(unique(hpg_reserve$date))
+#air_visit_data
+```
+
+```{r}
+################################
+#####  sample_submission   #####  
+################################
+#sample_submission
+# Number of diferent stores
+length(unique(sample_submission$air_store_id))
+# Number of days
+length(unique(sample_submission$date))
+#air_visit_data
+```
+
+
+# Merge them together
+
+**Create dataset with all the days and stores id combined. There are 821 stores_id and 517 different days. The new dataset needs to have 821 * 517 = 424,457 rows**
+```{r}
+time_id = fill_gaps(sample_submission, .start = date('2016-01-01')) 
+ 
+time_id %>% 
+  left_join(store_id_relation, by = 'air_store_id') %>% # Add the id of the hpg as well
+  left_join(date_info, by = 'date') %>% # add the hollidays and day of week
+  select(date,day_of_week,holiday_flg, air_store_id, hpg_store_id, id, visitors) ->time_id
+
+#names(time_id)[1] <- 'visitors_Prediction'
+names(time_id)[names(time_id) == 'visitors'] <- 'visitors_Pred'
+
+time_id # Number of rows needs to be 424,457
+```
+
+**Add the rest of the dataframes**
+
+```{r}
+# Add the air_visit_data and air_reserve
+time_id %>% 
+  left_join(air_visit_data, by = c('date', 'air_store_id')) %>%  
+  left_join(air_reserve, by = c('date', 'air_store_id')) -> new_dataset
+
+names(new_dataset)[names(new_dataset) == 'reserve_visitors'] <- 'air_reserve_visitors' # change the name to add the air
+
+# add the hpg_reserve
+new_dataset %>% 
+  left_join(hpg_reserve, by = c('date', 'hpg_store_id')) ->new_dataset
+
+names(new_dataset)[names(new_dataset) == 'reserve_visitors'] <- 'hpg_reserve_visitors' # change the name to add the air
+
+# add the air_store_info and hpg_store_info
+new_dataset %>% 
+  left_join(air_store_info, by = 'air_store_id') %>% 
+  left_join(hpg_store_info, by = 'hpg_store_id') %>%
+  select(date,day_of_week,holiday_flg, air_store_id, hpg_store_id, id, visitors_Pred, visitors, air_reserve_visitors, hpg_reserve_visitors, air_genre_name, hpg_genre_name) -> new_dataset
+
+new_dataset
+ 
+
+```
+
+**Dataset exploration**
+```{r}
+# lengths
+length(unique(new_dataset$date))
+length(unique(new_dataset$day_of_week))
+length(unique(new_dataset$holiday_flg))
+length(unique(new_dataset$air_store_id))
+length(unique(new_dataset$hpg_store_id))
+length(unique(new_dataset$id))
+length(unique(new_dataset$visitors_Pred))
+length(unique(new_dataset$visitors))
+length(unique(new_dataset$air_reserve_visitors))
+length(unique(new_dataset$hpg_reserve_visitors))
+length(unique(new_dataset$air_genre_name))
+length(unique(new_dataset$hpg_genre_name))
+```
+
+```{r}
+# Null count
+sum(is.na(new_dataset$date))
+sum(is.na(new_dataset$day_of_week))
+sum(is.na(new_dataset$holiday_flg))
+sum(is.na(new_dataset$air_store_id))
+sum(is.na(new_dataset$hpg_store_id))
+sum(is.na(new_dataset$id))
+sum(is.na(new_dataset$visitors_Pred))
+sum(is.na(new_dataset$visitors))
+sum(is.na(new_dataset$air_reserve_visitors))
+sum(is.na(new_dataset$hpg_reserve_visitors))
+sum(is.na(new_dataset$air_genre_name))
+sum(is.na(new_dataset$hpg_genre_name))
+```
+
+**Create new column with the total reserves. Change the Na to 0 for the reserve columns. Drop the hpg_store_id, visitors_Pred and hpg_genre_name**
+```{r}
+# change the Na to 0 for the reserve columns
+new_dataset[["air_reserve_visitors"]][is.na(new_dataset[["air_reserve_visitors"]])] <- 0
+new_dataset[["hpg_reserve_visitors"]][is.na(new_dataset[["hpg_reserve_visitors"]])] <- 0
+
+# Create new column with the total reserve
+new_dataset %>%
+    rowwise() %>% 
+    mutate(total_reserve = sum(c_across(contains("reserve_visitors")), na.rm = T))  %>% 
+    ungroup()%>%
+    select(date,day_of_week,holiday_flg, air_store_id, id, visitors, air_reserve_visitors, hpg_reserve_visitors, total_reserve, air_genre_name) %>%
+  as_tsibble(date, key='air_store_id') ->new_dataset1
+
+new_dataset1
+```
+
+**Dataset exploration**
+```{r}
+new_dataset1 %>%
+  filter(date<=date('2017-04-22')) -> train
+# lengths
+length(unique(train$date))
+length(unique(train$day_of_week))
+length(unique(train$holiday_flg))
+length(unique(train$air_store_id))
+length(unique(train$id))
+length(unique(train$visitors))
+length(unique(train$air_reserve_visitors))
+length(unique(train$hpg_reserve_visitors))
+length(unique(train$total_reserve))
+length(unique(train$air_genre_name))
+```
+
+```{r}
+# Null count
+sum(is.na(train$date))
+sum(is.na(train$day_of_week))
+sum(is.na(train$holiday_flg))
+sum(is.na(train$air_store_id))
+sum(is.na(train$id))
+sum(is.na(train$visitors))
+sum(is.na(train$air_reserve_visitors))
+sum(is.na(train$hpg_reserve_visitors))
+sum(is.na(train$total_reserve))
+sum(is.na(train$air_genre_name))
+```
+
+
+# Need to impute the Visitors values
+
+**First we remove the missing values from the start of the series.**
+
+```{r}
+new_dataset1 -> example # create a copy
+example$visitors_dup <- example$visitors # duplicate the column
+example
+
+example %>% 
+  dplyr::group_by(air_store_id) %>% # groupe by the id
+  tidyr::fill(visitors_dup, .direction = "down") %>% # impute the duplicated column downwards
+  drop_na(visitors_dup) %>% # drop the NA from the duplicated col
+  select(date,day_of_week,holiday_flg, air_store_id, id, visitors, visitors_dup, air_reserve_visitors, hpg_reserve_visitors, total_reserve, air_genre_name)  %>% # reorder
+  dplyr::ungroup() -> example #ungroup and save
+example
+
+example%>% filter(date<=date('2017-04-22'))
+```
+
+```{r}
+total_na = sum(is.na(example$visitors))
+train_na = sum(is.na((example%>% filter(date<=date('2017-04-22')))$visitors))
+total_rows = nrow(example)
+train_rows = nrow(example%>% filter(date<=date('2017-04-22')))
+cat('Number of NA from dataset (2016-01-01 to 2017-05-31):', total_na,'\n')
+cat('Number of NA from dataset (2016-01-01 to 2017-04-22):', train_na,'\n')
+cat('Number rows from dataset (2016-01-01 to 2017-05-31):', total_rows,'\n')
+cat('Number rows from dataset (2016-01-01 to 2017-04-22):', train_rows,'\n')
+
+cat('% Of NA (2016-01-01 to 2017-05-31):', (total_na/total_rows)*100,'%\n')
+cat('% Of NA (2016-01-01 to 2017-04-22):', (train_na/train_rows)*100,'%\n')
+
+```
+The missing values now is 75,531 from 325,999 rows that means 23.17% if missing values. Just by deleting the initials NA from the time series we have decrease the missing values from 40.99% to 23.17%. This is for the entire dataset, if we look only for the dates between 2016-01-01 to 2017-05-31, we can see that the missing values are 43,512 from 293,980 rows that means: 14.8% of missing values for the dates 2016-01-01 to 2017-04-22.
+
+
+
+
+Now in order to impute the missing values we are going to do it by using the adjacent values. But before doing this imputation, we are going to create a new column indicating which values were NA and which ones weren’t.
+
+
+
+
+```{r}
+example %>%
+  select(date,day_of_week,holiday_flg, air_store_id, id, visitors, air_reserve_visitors, hpg_reserve_visitors, total_reserve, air_genre_name) %>% # select colmuns
+  dplyr::group_by(air_store_id) %>% # group by id
+  
+  mutate(
+    na_val = case_when(visitors!='NA' ~ 0), # new column with 0 on all rows that are not NA
+      na_val = replace_na(na_val, 1)) %>% # add to the new column the 1 for the NA in visitors
+  mutate(na_val = replace(na_val, !is.na(id), 0)) %>% # Change the 1 to 0 for the dates after 2017-04-22
+  mutate(na_val_cumulative = cumsum(na_val)) %>% # columalative column
+  tidyr::fill(visitors, .direction = "down") %>% # impute the duplicated column downwards
+  dplyr::ungroup() -> final_dataset
+final_dataset
+```
+
+
+# Data Visualization
+```{r}
+final_dataset %>%
+  filter(date<= date('2017-04-22')) -> train
+
+
+```
+
+**Total visitors**
+```{r}
+train %>%
+  mutate(date_copy = date)%>% 
+  group_by(date_copy) %>%
+  summarise(all_visitors_mean = mean(visitors), all_visitors_sum = sum(visitors)) -> tt
+
+tt%>%
+  ggplot(aes(date_copy, all_visitors_sum)) +
+  geom_line(col = "Red") +
+  labs(title = "Total Visitors", x = "Date", y = "Total visitors")
+
+tt%>%
+  ggplot(aes(date_copy, all_visitors_mean)) +
+  geom_line(col = "Red") +
+  labs(title = "Mean Visitors", x = "Date", y = "Mean visitors")
+```
+**visitors by restaurant**
+```{r}
+train %>%
+  autoplot(visitors) + 
+  theme(legend.position = "none")
+```
+**Visitors histogram**
+```{r}
+train %>%
+  mutate(date_copy = date)%>% 
+  group_by(date_copy) %>%
+  summarise(all_visitors_mean = mean(visitors), all_visitors_sum = sum(visitors)) -> tt
+
+
+par(mfrow=c(2,1))
+hist(tt$all_visitors_mean, main = 'Mean Visitors') 
+hist(tt$all_visitors_sum, main = 'Total Visitors')
+```
+
+
+
+**Boxplots of visitors by day**
+```{r}
+boxplot(visitors~day_of_week, data=train, main="Visitors", xlab="Day of week", ylab="Visitors")
+
+
+train %>%
+  mutate(
+    date_copy = date,
+    day_of_week_numeric = case_when(
+      day_of_week=='Monday' ~1,
+      day_of_week=='Tuesday' ~2,
+      day_of_week=='Wednesday' ~3,
+      day_of_week=='Thursday' ~4,
+      day_of_week=='Friday' ~5,
+      day_of_week=='Saturday' ~6,
+      day_of_week=='Sunday' ~7,
+    ))%>% 
+  group_by(date_copy) %>%
+  summarise(all_visitors_mean = mean(visitors), all_visitors_sum = sum(visitors), day_of_week = mean(day_of_week_numeric) ) -> tt
+
+
+boxplot(all_visitors_sum~day_of_week, data=tt, main="Total Visitors", xlab="Day of week", ylab="Total Visitors")
+boxplot(all_visitors_mean~day_of_week, data=tt, main="Mean Visitors", xlab="Day of week", ylab="Mean Visitors")
+
+```
+
+**Boxplots of visitors by restaurant type**
+```{r}
+ggplot(train, aes(air_genre_name, visitors)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  + labs(title = "Visitors", x = "Type of restaurant", y = "Visitors")
+
+train %>%
+  mutate(
+    date_copy = date,
+    air_genre_name_numeric = case_when(
+      air_genre_name=='Italian/French' ~1,
+      air_genre_name=='Izakaya' ~2,
+      air_genre_name=='Dining bar' ~3,
+      air_genre_name=='Cafe/Sweets' ~4,
+      air_genre_name=='Japanese food' ~5,
+      air_genre_name=='Western food' ~6,
+      air_genre_name=='Okonomiyaki/Monja/Teppanyaki' ~7,
+      air_genre_name=='Yakiniku/Korean food' ~8,
+      air_genre_name=='Asian' ~9,
+      air_genre_name=='Bar/Cocktail' ~10,
+      air_genre_name=='Creative cuisine' ~11,
+      air_genre_name=='International cuisine' ~12,
+      air_genre_name=='Karaoke/Party' ~13,
+      air_genre_name=='Other' ~14,
+    )) %>% 
+  group_by(air_genre_name) %>%
+  summarise(all_visitors_mean = mean(visitors), all_visitors_sum = sum(visitors), air_genre_name_numeric = mean(air_genre_name_numeric) ) %>%
+  mutate(
+    air_genre_name = case_when(
+      air_genre_name_numeric== 1 ~ 'Italian/French',
+      air_genre_name_numeric== 2 ~ 'Izakaya',
+      air_genre_name_numeric== 3 ~ 'Dining bar',
+      air_genre_name_numeric== 4 ~ 'Cafe/Sweets',
+      air_genre_name_numeric== 5 ~ 'Japanese food',
+      air_genre_name_numeric== 6 ~ 'Western food',
+      air_genre_name_numeric== 7 ~ 'Okonomiyaki/Monja/Teppanyaki',
+      air_genre_name_numeric== 8 ~ 'Yakiniku/Korean food',
+      air_genre_name_numeric== 9 ~ 'Asian',
+      air_genre_name_numeric== 10 ~ 'Bar/Cocktail',
+      air_genre_name_numeric== 11 ~ 'Creative cuisine',
+      air_genre_name_numeric== 12 ~ 'International cuisine',
+      air_genre_name_numeric== 13 ~ 'Karaoke/Party',
+      air_genre_name_numeric== 14 ~ 'Other',
+    ))-> tt
+
+ggplot(tt, aes(air_genre_name, all_visitors_sum)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + labs(title = "Total Visitors", x = "Type of restaurant", y = "Total Visitors")
+ggplot(tt, aes(air_genre_name, all_visitors_mean)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + labs(title = "Mean Visitors", x = "Type of restaurant", y = "Mean Visitors")
+```
+
+
+
+
+
+
+
+**Reserves by restaurant**
+```{r}
+train %>%
+  autoplot(air_reserve_visitors) + 
+  theme(legend.position = "none") + 
+  labs(title = "Air Reserves", x = "Date", y = "Reserves")
+train %>%
+  autoplot(hpg_reserve_visitors) + 
+  theme(legend.position = "none") + 
+  labs(title = "Hpg Reserves", x = "Date", y = "Reserves")
+train %>%
+  autoplot(total_reserve) + 
+  theme(legend.position = "none") + 
+  labs(title = "Air+Hpg Reserves", x = "Date", y = "Reserves")
+```
+
+We can see that there are some outliers, lets remove them and impute using the closest points
+
+```{r}
+# change outliers to NA
+final_dataset %>%
+  mutate_at(vars(matches('air_reserve_visitors')), ~ 
+                  replace(., air_reserve_visitors >= 450, NA)) -> final_dataset2
+# Impute outliers
+final_dataset2 %>% 
+  dplyr::group_by(air_store_id) %>% # groupe by the id
+  tidyr::fill(air_reserve_visitors, .direction = "down") %>% # impute the duplicated column downwards
+  dplyr::ungroup() -> final_dataset2 #ungroup and save
+# calculate total
+final_dataset2 %>% rowwise() %>% 
+    mutate(total_reserve = sum(c_across(contains("reserve_visitors")), na.rm = T))  %>% 
+    ungroup() %>%
+  as_tsibble(date, key='air_store_id') -> final_dataset2
+
+final_dataset2
+```
+
+
+
+
+```{r}
+final_dataset2 %>%
+  filter(date<= date('2017-04-22')) -> train2
+train2
+```
+
+
+```{r}
+train2 %>%
+  autoplot(air_reserve_visitors) + 
+  theme(legend.position = "none") + 
+  labs(title = "Air Reserves", x = "Date", y = "Reserves")
+train2 %>%
+  autoplot(hpg_reserve_visitors) + 
+  theme(legend.position = "none") + 
+  labs(title = "Hpg Reserves", x = "Date", y = "Reserves")
+train2 %>%
+  autoplot(total_reserve) + 
+  theme(legend.position = "none") + 
+  labs(title = "Air+Hpg Reserves", x = "Date", y = "Reserves")
+```
+
+```{r}
+train2 %>%
+  mutate(date_copy = date)%>% 
+  group_by(date_copy) %>%
+  summarise(total_reserve_mean = mean(total_reserve), total_reserve_sum = sum(total_reserve)) -> tt
+
+tt%>%
+  ggplot(aes(date_copy, total_reserve_sum)) +
+  geom_line(col = "Red") +
+  labs(title = "Total Reserves", x = "Date", y = "Total Reserves")
+
+tt%>%
+  ggplot(aes(date_copy, total_reserve_mean)) +
+  geom_line(col = "Red") +
+  labs(title = "Mean Reserves", x = "Date", y = "Mean Reserves")
+```
+
+```{r}
+train2 %>%
+  mutate(date_copy = date)%>% 
+  group_by(date_copy) %>%
+  summarise(total_reserve_mean = mean(total_reserve), total_reserve_sum = sum(total_reserve)) -> tt
+
+
+par(mfrow=c(2,1))
+hist(tt$total_reserve_mean, main = 'Mean Reserves') 
+hist(tt$total_reserve_sum, main = 'Total Reserves')
+```
+
+
+```{r}
+
+train2 %>% 
+  mutate(date_copy = date)%>% 
+  group_by(date_copy) %>%
+  summarise(holiday_flg = mean(holiday_flg), total_visitors_mean = mean(visitors))%>%
+  mutate(
+    holiday_flg_text = case_when(
+      holiday_flg==0 ~ 'No holiday',
+      holiday_flg==1 ~ 'holiday')) %>%
+  ungroup() -> tt
+tt
+ggplot(tt, aes(holiday_flg_text, total_visitors_mean)) + geom_boxplot() +
+  #theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))  + 
+  labs(title = "Mean Visitors", x = "Holiday type", y = "Mean Visitors")
+```
+
+
+```{r}
+
+train2 %>% 
+  mutate(
+    air_genre_name = case_when(
+      air_genre_name=='Italian/French' ~1,
+      air_genre_name=='Izakaya' ~2,
+      air_genre_name=='Dining bar' ~3,
+      air_genre_name=='Cafe/Sweets' ~4,
+      air_genre_name=='Japanese food' ~5,
+      air_genre_name=='Western food' ~6,
+      air_genre_name=='Okonomiyaki/Monja/Teppanyaki' ~7,
+      air_genre_name=='Yakiniku/Korean food' ~8,
+      air_genre_name=='Asian' ~9,
+      air_genre_name=='Bar/Cocktail' ~10,
+      air_genre_name=='Creative cuisine' ~11,
+      air_genre_name=='International cuisine' ~12,
+      air_genre_name=='Karaoke/Party' ~13,
+      air_genre_name=='Other' ~14
+      ),
+    day_of_week = case_when(
+      day_of_week=='Monday' ~1,
+      day_of_week=='Tuesday' ~2,
+      day_of_week=='Wednesday' ~3,
+      day_of_week=='Thursday' ~4,
+      day_of_week=='Friday' ~5,
+      day_of_week=='Saturday' ~6,
+      day_of_week=='Sunday' ~7,
+    )) %>%
+  as_tibble(date) %>%
+  select(date, 
+         day_of_week, 
+         holiday_flg,
+         visitors,
+         air_reserve_visitors,
+         hpg_reserve_visitors,
+         total_reserve,
+         air_genre_name,
+         na_val,
+         na_val_cumulative) ->tt
+tt
+
+
+#kdepairs(tt)
+tt %>%
+  GGally::ggpairs() + labs(title = "Variables Relations")
+```
+
+
+
+# Build the model
+
+```{r}
+train2 %>% 
+  filter(date <= date('2017-03-05')) -> train_set
+train2 %>% 
+  filter(date > date('2017-03-05')) -> test_set
+length(unique(train2$date))
+length(unique(train_set$date))
+length(unique(test_set$date))
+
+```
+
+## Build the TSLM models
+
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    # Normal model Trend + season
+    ts = TSLM(visitors ~ trend() + season()),
+    # Include Treand season day of week and holiday flag
+    tsdh = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg),
+    
+    # Include reservations
+    tsTR = TSLM(visitors ~ trend() + season() + total_reserve),
+    
+    # Include the genre
+    tsg = TSLM(visitors ~ trend() + season() + air_genre_name),
+
+    # Include Null count
+    tsn = TSLM(visitors ~ trend() + season() + na_val),
+    tsNC = TSLM(visitors ~ trend() + season() + na_val_cumulative),
+    
+    
+    tsdhARHRTRnNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + na_val + na_val_cumulative),
+    
+    )
+fit
+```
+
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_TSLM
+accuracy_TSLM
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    ) %>%
+  #arrange(desc(avg_adj_r_squared)) -> glance_TSLM
+  arrange(avg_BIC) -> glance_TSLM
+glance_TSLM
+```
+
+
+## Build the ARIMA models
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    'arima' = ARIMA(visitors, stepwise = FALSE, approx = FALSE),
+    'arima_TR' = ARIMA(visitors ~ total_reserve),#, stepwise = FALSE, approx = FALSE
+    'arima_dh' = ARIMA(visitors ~ day_of_week + holiday_flg), #, stepwise = FALSE, approx = FALSE
+    'arima_dhTR' = ARIMA(visitors ~ day_of_week + holiday_flg + total_reserve),#, stepwise = FALSE, approx = FALSE
+    )
+fit
+
+#report(fit)
+#report(fit %>% filter(air_store_id =='air_0241aa3964b7f861'))
+```
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_ARIMA
+accuracy_ARIMA
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_AIC = mean(AIC),
+    avg_sigma2 = mean(sigma2),
+    ) %>%
+  arrange(avg_BIC) -> glance_ARIMA
+glance_ARIMA
+```
+
+
+
+
+
+## Build the Dynamic Harmonic regression models
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    'K = 1' = ARIMA(visitors ~ fourier(K=1)),
+    'K = 2' = ARIMA(visitors ~ fourier(K=2)),
+    'K = 3' = ARIMA(visitors ~ fourier(K=3)),
+    )
+fit
+
+#report(fit)
+#report(fit %>% filter(air_store_id =='air_0241aa3964b7f861'))
+```
+
+```{r}
+prediction <- fit %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861') %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+```{r}
+
+prediction %>%
+  #accuracy(test_set %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_DyHarRe
+accuracy_DyHarRe
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_AIC = mean(AIC),
+    avg_sigma2 = mean(sigma2),
+    ) %>%
+  arrange(avg_BIC) -> glance_DyHarRe
+glance_DyHarRe
+```
+
+
+
+
+
+
+
+
+
+```{r}
+train2
+
+final_dataset2
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+fit <- train_set %>%
+  #filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')%>%
+  model(
+    # Normal model Trend + season
+    ts = TSLM(visitors ~ trend() + season()),
+    # Include Treand season day of week and holiday flag
+    tsdh = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg),
+    
+    # Include reservations
+    tsAR = TSLM(visitors ~ trend() + season() + air_reserve_visitors),
+    tsHR = TSLM(visitors ~ trend() + season() + hpg_reserve_visitors),
+    tsTR = TSLM(visitors ~ trend() + season() + total_reserve),
+    tsARHRTR = TSLM(visitors ~ trend() + season() + air_reserve_visitors + hpg_reserve_visitors + total_reserve),
+    # Include day of week and holiday flag + reservations
+    tsdhAR = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors),
+    tsdhHR = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + hpg_reserve_visitors),
+    tsdhTR = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + total_reserve),
+    tsdhARHRTR = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve),
+    
+    # Include the genre
+    tsg = TSLM(visitors ~ trend() + season() + air_genre_name),
+    # Include day of week and holiday flag + genre
+    tsdhg = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_genre_name),
+    # Include day of week, holiday flag and reservations + genre
+    tsdhARHRTRg = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + air_genre_name),
+    
+    # Include Null count
+    tsn = TSLM(visitors ~ trend() + season() + na_val),
+    tsNC = TSLM(visitors ~ trend() + season() + na_val_cumulative),
+    tsnNC = TSLM(visitors ~ trend() + season() + na_val + na_val_cumulative),
+    # Include day of week and holiday flag + Null count
+    tsdhn = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + na_val),
+    tsdhNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + na_val_cumulative),
+    tsdhnNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + na_val + na_val_cumulative),
+    # Include day of week, holiday flag and reservations + Null count
+    tsdhARHRTRn = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + na_val),
+    tsdhARHRTRNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + na_val_cumulative),
+    tsdhARHRTRnNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + na_val + na_val_cumulative),
+    # Include day of week, holiday flag, reservations and genre + Null count
+    tsdhARHRTRgn = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + air_genre_name + na_val),
+    tsdhARHRTRgNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + air_genre_name + na_val_cumulative),
+    tsdhARHRTRgnNC = TSLM(visitors ~ trend() + season() + day_of_week + holiday_flg + air_reserve_visitors + hpg_reserve_visitors + total_reserve + air_genre_name + na_val + na_val_cumulative),
+  )
+fit
+```
+```{r}
+#prediction <- fit %>% 
+#  forecast(train2 %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861'))
+
+prediction <- fit %>% 
+  forecast(test_set) # train2
+
+prediction
+```
+
+
+```{r}
+prediction %>%
+  #accuracy(train2 %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861')) %>%
+  accuracy(test_set) %>% # train2
+  group_by(.model) %>%   
+  summarize(
+    avg_ME = mean(ME),
+    avg_RMSE = mean(RMSE),
+    avg_MAE = mean(MAE),
+    avg_ACF1 = mean(ACF1),
+    avg_MPE = mean(MPE),
+    avg_MAPE = mean(MAPE),
+    avg_MASE = mean(MASE),
+    avg_RMSSE = mean(RMSSE)
+    ) %>%
+  arrange(avg_RMSE) -> accuracy_TSLM
+accuracy_TSLM
+
+glance(fit) %>%
+  group_by(.model) %>% 
+  summarize(
+    avg_BIC = mean(BIC),
+    avg_AICc = mean(AICc),
+    avg_adj_r_squared = mean(adj_r_squared),
+    avg_CV = mean(CV),
+    avg_AIC = mean(AIC),
+    ) %>%
+  #arrange(desc(avg_adj_r_squared)) -> glance_TSLM
+  arrange(avg_BIC) -> glance_TSLM
+glance_TSLM
+```
+
+```{r}
+fc %>%
+  filter(.model == "tsdhARHRTRn" | .model == "tsdhn" | .model == "tsn" | .model == "tsTR" | .model == "tsNC") %>%
+  autoplot(train2 %>% filter(air_store_id =='air_00a91d42b08b08d9'| air_store_id == 'air_0241aa3964b7f861'), level = NULL, colour = 'red')
+```
+
+```{r}
+train_set 
+```
