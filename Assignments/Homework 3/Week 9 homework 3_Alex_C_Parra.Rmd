@@ -1,0 +1,591 @@
+---
+title: "Week 9 homework 3_Alex_C_Parra"
+author: "Alex Parra"
+date: "19/7/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+
+
+
+# **9.11 exercise 9**
+```{r}
+us_aus_arrivals <- aus_arrivals %>%
+  filter(Origin=='US' )
+
+us_aus_arrivals
+```
+
+**a)**
+```{r}
+us_aus_arrivals %>%
+  autoplot(Arrivals)
+```
+We can see an ascending trend in the data with some seasonality factor in play, after 200 we can see that the trend slows down and even stop.
+
+
+**b)**
+```{r}
+us_aus_arrivals %>%
+  mutate(diff_Arrivals = difference(Arrivals)) -> us_aus_arrivals_diff
+us_aus_arrivals_diff
+us_aus_arrivals_diff %>%
+  autoplot(diff_Arrivals)
+```
+
+**c)**
+```{r}
+us_aus_arrivals_diff %>% ACF(diff_Arrivals) %>% 
+  autoplot() + labs(subtitle = "Changes in us-aus travelers")
+```
+We can see that there are multiple autocorrelation that lies outside the 95% limits, this repeats every 2 observation, First in the negative at lag 2, then positive at lag 4, then again negative at lag 6, and so on.
+
+**d)**
+```{r}
+us_aus_arrivals_diff %>% PACF(diff_Arrivals) %>% 
+  autoplot() + labs(subtitle = "Changes in us-aus travelers")
+```
+If we look instead at the partial correlation, we can see that there are multiple spikes at the biggening, at lag 2, 3, 4 and then one last at 7, after that we can see that there isn’t any other.
+
+**e)**
+We can see that the ACF is sinusoidal, and there is a spike at lag 7 in the PACF, meaning that the model is most likely p=7, d=0, q=0 ARIMA(7,0,0). d is 0 because we have already differentiated before.
+
+
+**f)**
+
+I tried creating the model with p=7, but it gave me and error, so I tried 4
+```{r}
+fit_410 <- us_aus_arrivals_diff %>%
+  model('arima410' = ARIMA(diff_Arrivals ~ pdq(4,0,0)))
+
+report(fit_410)
+
+print('')
+
+fit_auto <- us_aus_arrivals_diff %>%
+  model('auto' = ARIMA(diff_Arrivals))
+
+report(fit_auto)
+
+```
+We can see that the model with the best AIC and AICc is the auto model. But the difference is not by much, the main difference between the auto model and the model we chose is that the p component in the auto model is 2 and not 4.
+
+
+
+
+
+# **9.11 exercise 10**
+```{r}
+us_employment %>% filter(Series_ID == 'CEU0500000001') -> ex10
+ex10
+```
+
+
+**a)**
+```{r}
+dcmp <- ex10 %>%
+  model(stl = STL(Employed))
+components(dcmp)
+components(dcmp) %>% autoplot()
+```
+We can see a positive trend in the data, that increase in all the time series. In the seasonality we can see and alternating pattern, a pattern that get amplified as time goes on, meaning that the seasons are more variables the later in time we look
+
+**b)**
+```{r}
+lambda <- ex10 %>%
+  features(Employed, features = guerrero) %>%
+  pull(lambda_guerrero)
+ex10 %>%
+  autoplot(box_cox(Employed, lambda)) +
+  labs(y = "",
+       title = paste0(
+         "Transformed gas production with lambda = ",
+         round(lambda,2)))
+```
+
+
+The Box-Cox seams like a good transformation as it will allow us to make the seasonality the same across the hole time series
+
+```{r}
+ex10 %>%
+  mutate(box_cox_Employed = box_cox(Employed, lambda)) -> ex10_box_cox
+ex10_box_cox
+
+
+dcmp <- ex10_box_cox %>%
+  model(stl = STL(box_cox_Employed))
+components(dcmp)
+components(dcmp) %>% autoplot()
+```
+
+
+
+
+
+**c)**
+```{r}
+
+ex10_box_cox %>%
+  mutate(diff_box_cox_Employed = difference(box_cox_Employed)) -> ex10_box_cox_diff
+ex10_box_cox_diff
+ex10_box_cox_diff %>%
+  autoplot(diff_box_cox_Employed)
+
+
+```
+
+**d)**
+```{r}
+ex10 %>%
+  gg_tsdisplay(difference(box_cox(Employed, lambda)), plot_type='partial')
+```
+
+```{r}
+fit <- ex10 %>%
+  model('arima010' = ARIMA(box_cox(Employed, lambda) ~ pdq(0,1,0)),
+        'arima110' = ARIMA(box_cox(Employed, lambda) ~ pdq(1,1,0)),
+        'arima210' = ARIMA(box_cox(Employed, lambda) ~ pdq(2,1,0)),
+        'arima011' = ARIMA(box_cox(Employed, lambda) ~ pdq(0,1,1)),
+        'arima012' = ARIMA(box_cox(Employed, lambda) ~ pdq(0,1,1)),
+        'auto'     = ARIMA(box_cox(Employed, lambda), stepwise=FALSE))
+report (fit)
+```
+
+We can see that the best model is the auto model with the lowest AIC (6380.17) and AICc (6380.32), followed by the ARIMA 210.
+
+**e)**
+```{r}
+fit <- ex10 %>%
+  model(ARIMA(box_cox(Employed, lambda), stepwise=FALSE)) 
+
+report(fit)
+
+fit %>% gg_tsresiduals()
+```
+We can see that the auto model is a (2,0,1)(2,1,1) ARIMA. If we look at the residuals we can see that they follow a normal distribution, with most values around the 0 value, but there is a couples of autocorrelation at lag 7 and 18.
+
+
+
+**f)**
+```{r}
+
+
+fc <- fit %>%
+  forecast(h = 36) 
+
+fc %>%
+  autoplot(ex10)
+
+```
+**g)**
+The predictions intervals are going to grow as the time prediction increases, meaning that the further in the future we are the harder is to make a prediction. So I don’t think there is a hard limit after that the predictions are unusable, is more gradual than that. But you can use it to make predictions with in the next year and get good results.
+
+# **9.11 exercise 11**
+```{r}
+aus_production %>% select(Quarter, Electricity) -> ex11
+
+ex11
+
+
+
+```
+
+
+**a)**
+```{r}
+ex11 %>% autoplot(Electricity)
+```
+
+The data doesn’t look like it needs a transformation.
+
+**b)**
+```{r}
+ex11 %>%
+  mutate(diff_Electricity = difference(Electricity)) -> ex11_diff
+
+ex11_diff
+
+ex11_diff %>%
+  autoplot(diff_Electricity)
+```
+
+**c)**
+```{r}
+ex11 %>%
+  gg_tsdisplay(difference(Electricity), plot_type='partial')
+```
+
+```{r}
+fit <- ex11 %>%
+  model('arima010' = ARIMA(Electricity ~ pdq(0,1,0)),
+        'arima110' = ARIMA(Electricity ~ pdq(1,1,0)),
+        'arima210' = ARIMA(Electricity ~ pdq(2,1,0)),
+        'arima011' = ARIMA(Electricity ~ pdq(0,1,1)),
+        'arima012' = ARIMA(Electricity ~ pdq(0,1,1)),
+        'auto'     = ARIMA(Electricity, stepwise=FALSE))
+report (fit)
+```
+
+We can see that the best model is the arima011 and arima012 with the lowest AIC (3418.716) and AICc (3419)
+
+**d)**
+```{r}
+fit <- ex11 %>%
+  model('arima011' = ARIMA(Electricity ~ pdq(0,1,1))) 
+
+report(fit)
+
+fit %>% gg_tsresiduals()
+```
+We can see that the auto model is a (0,1,1)(1,1,2) ARIMA. If we look at the residuals, we can see that they follow a normal distribution, with most values around the 0 value although it looks like it have a long left tail, but there is a couples of autocorrelation at lag 6 and 22.
+
+**e)**
+```{r}
+
+fc <- fit %>%
+  forecast(h = 8) 
+
+fc %>%
+  autoplot(ex11)
+
+```
+**f)**
+```{r}
+fit <- ex11 %>% model(ETS(Electricity))
+report(fit)
+
+fc <- fit %>%
+  forecast(h = 8) 
+
+fc %>%
+  autoplot(ex11)
+```
+We can see that this model ETS, has a AIC of 3840 and an AICc of 3841, they are greater than the ARIMA model, meaning that the ARIMA is better
+
+# **9.11 exercise 12**
+```{r}
+
+dcmp <- ex11 %>%
+  model(stl = STL(Electricity))
+
+components(dcmp)
+
+components(dcmp) %>% autoplot()
+
+
+
+fit <- components(dcmp) %>% 
+  select(Quarter,season_adjust)%>%
+  model('arima010' = ARIMA(season_adjust ~ pdq(0,1,0)),
+        'arima110' = ARIMA(season_adjust ~ pdq(1,1,0)),
+        'arima210' = ARIMA(season_adjust ~ pdq(2,1,0)),
+        'arima011' = ARIMA(season_adjust ~ pdq(0,1,1)),
+        'arima012' = ARIMA(season_adjust ~ pdq(0,1,1)),
+        'auto'     = ARIMA(season_adjust, stepwise=FALSE))
+report(fit)
+```
+
+We can see now that the best model is the auto model with an AIC of 3373.029 and an AICc of 3373.72, this are better metrics than before, meaning that the new method is better
+
+
+
+# **10.7 exercise 3**
+```{r}
+vic_elec_daily <- vic_elec %>%
+  filter(year(Time) == 2014) %>%
+  index_by(Date = date(Time)) %>%
+  summarise(
+    Demand = sum(Demand)/1e3,
+    Temperature = max(Temperature),
+    Holiday = any(Holiday)) %>%
+  mutate(
+    Temp2 = I(pmax(Temperature-25,0)),
+    Day_Type = case_when(
+      Holiday ~ "Holiday",
+      wday(Date) %in% 2:6 ~ "Weekday",
+      TRUE ~ "Weekend"))
+vic_elec_daily
+```
+```{r}
+fit_trends <- vic_elec_daily %>%
+  filter(Date < '2014-12-1	') %>%
+  model(
+    linear = TSLM(Demand ~ Temperature ),
+    piecewise = TSLM(Demand ~ Temperature + Temp2)
+  )
+
+fc_trends <- fit_trends %>% forecast(vic_elec_daily)
+
+
+vic_elec_daily %>%
+  autoplot(Demand,
+    level = NULL) +
+  geom_line(data = fitted(fit_trends),
+            aes(y = .fitted, colour = .model))
+
+```
+
+
+
+# **10.7 exercise 4**
+```{r}
+aus_accommodation
+```
+**a)**
+```{r}
+aus_accommodation %>%
+  mutate(Adjusted_Takings = Takings / CPI * 100) -> aus_accommodation_new
+
+aus_accommodation_new
+
+aus_accommodation_new %>%
+  autoplot(Adjusted_Takings)
+
+
+```
+
+**b)**
+```{r}
+fit <- aus_accommodation_new %>%
+  model(
+    ARIMA(Adjusted_Takings ~ fourier(K=2) +
+           trend(c(2008, 2009)) + pdq(1,1,0))
+  )
+
+report(fit)
+```
+
+**I don’t know what error that is, or how to fix it. So, no idea what to do or how to continue**
+
+
+# **10.7 exercise 5**
+```{r}
+us_gasoline 
+us_gasoline %>%
+  autoplot(Barrels)
+```
+**a)**
+```{r}
+fit <- us_gasoline %>%
+  model(
+    'model1_6-11' = TSLM(Barrels ~ fourier(K=1) + trend(c(2006, 2011)) ),
+    'model1_7-12' = TSLM(Barrels ~ fourier(K=1) + trend(c(2007, 2012)) ),
+    'model1_8-13' = TSLM(Barrels ~ fourier(K=1) + trend(c(2008, 2013)) ),
+    'model2_6-11' = TSLM(Barrels ~ fourier(K=2) + trend(c(2006, 2011)) ),
+    'model2_7-12' = TSLM(Barrels ~ fourier(K=2) + trend(c(2007, 2012)) ),
+    'model2_8-13' = TSLM(Barrels ~ fourier(K=2) + trend(c(2008, 2013)) ),
+    'model3_6-11' = TSLM(Barrels ~ fourier(K=3) + trend(c(2006, 2011)) ),
+    'model3_7-12' = TSLM(Barrels ~ fourier(K=3) + trend(c(2007, 2012)) ),
+    'model3_8-13' = TSLM(Barrels ~ fourier(K=3) + trend(c(2008, 2013)) )
+  )
+
+glance(fit)
+```
+We can see that the model with the lowest AIC and AICc is the model2_6-11 with 2 term Fourier and the knots between 2006-2011.
+
+**b)**
+```{r}
+fit <- us_gasoline %>%
+  model(
+    'model2_6-11' = ARIMA(Barrels ~ fourier(K=2) + trend(c(2006, 2011)) ) # + pdq(1,1,0)
+  )
+
+report(fit)
+```
+We can see that the ARIMA model chosen was (1,0,2)(2,0,0) with an AIC of 151.48 and AICc of 151.8.
+
+**c)**
+
+```{r}
+fit %>% gg_tsresiduals()
+```
+```{r}
+augment(fit) %>%
+  features(.innov, ljung_box, lag=12, dof=4)
+```
+The model looks like it resembles white noise.
+
+
+**d)**
+```{r}
+fc <- fit %>%
+  forecast(h=52)
+
+fc %>%
+  autoplot(us_gasoline)
+```
+
+
+# **10.7 exercise 6**
+
+
+**a)**
+The model is: (0,1,1)(2,1,0)
+
+**b)**
+These two parameters’ reflets the increase in the monthly total kilowatt-hour of electricity used when the monthly total heating degrees increase by 1 (B1) and the monthly total cooling degrees increase by 1(B2). 
+So, the exact values that the fitted model reflets that: for each increase in 1 by the total heating degrees the total kilowatt-hour of electricity used increase by 0.0077; for each increase in 1 by monthly total cooling degrees the total kilowatt-hour of electricity used increase by 0.0208.
+
+
+# **11.7 exercise 2**
+```{r}
+tourism_full <- tourism %>%
+  aggregate_key((State/Region) * Purpose, Trips = sum(Trips))
+tourism_full
+
+```
+
+```{r}
+
+fit <- tourism_full %>%
+  filter(year(Quarter) <= 2015) %>%
+  model(base = ETS(Trips)) %>%
+  reconcile(
+    bu = bottom_up(base),
+    ols = min_trace(base, method = "ols"),
+    mint = min_trace(base, method = "mint_shrink"),
+  ) 
+```
+
+```{r}
+fc <- fit %>% forecast(h = "2 years")
+fc %>%
+  filter(is_aggregated(Region), is_aggregated(Purpose)) %>%
+  autoplot(
+    tourism_full %>% filter(year(Quarter) >= 2011),
+    level = NULL
+  ) +
+  labs(y = "Trips ('000)") +
+  facet_wrap(vars(State), scales = "free_y")
+```
+
+```{r}
+fc %>%
+  filter(is_aggregated(State), !is_aggregated(Purpose)) %>%
+  autoplot(
+    tourism_full %>% filter(year(Quarter) >= 2011),
+    level = NULL
+  ) +
+  labs(y = "Trips ('000)") +
+  facet_wrap(vars(Purpose), scales = "free_y")
+```
+
+```{r}
+fc %>%
+  filter(is_aggregated(State), is_aggregated(Purpose)) %>%
+  accuracy(
+    data = tourism_full,
+    measures = list(rmse = RMSE, mase = MASE)
+  ) %>%
+  group_by(.model) %>%
+  summarise(rmse = mean(rmse), mase = mean(mase))
+```
+
+```{r}
+fc %>%
+  filter(is_aggregated(State), is_aggregated(Purpose)) %>%
+  accuracy(tourism_full, list(skill = skill_score(CRPS))) %>% 
+  arrange(desc(skill))
+```
+We can see that the base model achieve the best performance using this method, with a skill score of 0.1886.
+
+
+# **11.7 exercise 3**
+
+```{r}
+prison <- readr::read_csv("https://OTexts.com/fpp3/extrafiles/prison_population.csv") %>%
+  mutate(Quarter = yearquarter(Date)) %>%
+  select(-Date)  %>%
+  as_tsibble(key = c(Gender, Legal, State, Indigenous),
+             index = Quarter) %>%
+  relocate(Quarter)
+
+prison_gts <- prison %>%
+  aggregate_key(Gender * Legal * State, Count = sum(Count)/1e3)
+
+prison_gts %>%
+  filter(!is_aggregated(Gender), is_aggregated(Legal),
+         is_aggregated(State)) %>%
+  autoplot(Count) +
+  labs(y = "Number of prisoners ('000)")
+```
+
+
+
+
+```{r}
+fit <- prison_gts %>%
+  filter(year(Quarter) <= 2014) %>%
+  model(base = ETS(Count)) %>%
+  reconcile(
+    bottom_up = bottom_up(base),
+    MinT = min_trace(base, method = "mint_shrink")
+  )
+fc <- fit %>% forecast(h = 8)
+fc %>%
+  filter(is_aggregated(State), is_aggregated(Gender),
+         is_aggregated(Legal)) %>%
+  autoplot(prison_gts, alpha = 0.7, level = 90) +
+  labs(y = "Number of prisoners ('000)",
+       title = "Australian prison population (total)") 
+```
+```{r}
+fc %>%
+  filter(
+    .model %in% c("base", "MinT"),
+    !is_aggregated(State), is_aggregated(Legal),
+    is_aggregated(Gender)
+  ) %>%
+  autoplot(
+    prison_gts %>% filter(year(Quarter) >= 2010),
+    alpha = 0.7, level = 90
+  ) +
+  labs(title = "Prison population (by state)",
+       y = "Number of prisoners ('000)") +
+  facet_wrap(vars(State), scales = "free_y", ncol = 4) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+```{r}
+fc %>%
+  filter(is_aggregated(State), is_aggregated(Gender),
+         is_aggregated(Legal)) %>%
+  accuracy(data = prison_gts,
+           measures = list(mase = MASE,
+                           ss = skill_score(CRPS)
+                           )
+           ) %>%
+  group_by(.model) %>%
+  summarise(mase = mean(mase), sspc = mean(ss) * 100)
+```
+
+```{r}
+fc <- fit %>% forecast(h = 8, bootstrap = TRUE)
+fc %>%
+  filter(is_aggregated(State), is_aggregated(Gender),
+         is_aggregated(Legal)) %>%
+  accuracy(data = prison_gts,
+           measures = list(mase = MASE,
+                           ss = skill_score(CRPS)
+                           )
+           ) %>%
+  group_by(.model) %>%
+  summarise(mase = mean(mase), sspc = mean(ss) * 100)
+```
+
+We can see that the new CRPS skill scores are higher for the base model, but lower on the other two model (bottom up and Mint)
+
+

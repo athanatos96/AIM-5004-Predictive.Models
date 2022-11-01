@@ -1,0 +1,699 @@
+---
+title: "Week 3 homework 1"
+author: "Alex Parra"
+date: "11/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tsibble)
+library(fpp3)
+library(seasonal)
+library(glue)
+library(GGally)
+
+```
+
+
+# **2.10 exercise 9**
+```{r}
+# “Total Private” Employed from us_employment
+employed_total_private  <- us_employment  %>%
+  filter(Title == "Total Private" & year(Month) >= 1980) %>%
+  select(Month, Employed)
+
+autoplot(employed_total_private, Employed) +
+  labs(title = "US privete employees",
+       subtitle = "Total Private")
+
+gg_season(employed_total_private, Employed) +
+  labs(title = "US privete employees",
+       subtitle = "Total Private")
+
+gg_subseries(employed_total_private, Employed) +
+  labs(title = "US privete employees",
+       subtitle = "Total Private")
+
+gg_lag(employed_total_private, Employed) +
+  labs(title = "US privete employees",
+       subtitle = "Total Private")
+
+employed_total_private %>% ACF(Employed, lag_max = 9)
+
+employed_total_private %>%
+  ACF(Employed) %>%
+  autoplot() + 
+  labs(title="US privete employees",
+       subtitle = "Total Private")
+```
+
+We can see that there is seasonality on the data, the number of employees start as a lower value in January a slowly grow over the month until it gets a peek in the summer month, and then it starts decreasing again. We can see that there is no cyclicity on the data, as there are no longer cycles. The trend is increasing over time, except for the 2007-2008 crises where the employment decrease.
+
+
+We see an increasing series that grow over time as the country grows, there is an important seasonal pattern over the months, where the employment grows during the first half of the year and decreases over the second half. There are a couple of unusual years during the early 80 decade, the early 90 decade, the early and late 2020 decade, where employment decrease, as it was periods of economic crisis.
+
+
+```{r}
+# Bricks from aus_production
+bricks_aus_production   <- aus_production  %>%
+  filter(year(Quarter) >= 1980) %>% #& Title == "Total Private" 
+  select(Quarter, Bricks)
+
+autoplot(bricks_aus_production, Bricks) +
+  labs(title = "Australian brick production")
+
+gg_season(bricks_aus_production, Bricks) +
+  labs(title = "Australian brick production")
+
+gg_subseries(bricks_aus_production, Bricks) +
+  labs(title = "Australian brick production")
+
+gg_lag(bricks_aus_production, Bricks) +
+  labs(title = "Australian brick production")
+
+bricks_aus_production %>% ACF(Bricks, lag_max = 9)
+
+bricks_aus_production %>%
+  ACF(Bricks) %>%
+  autoplot() + 
+  labs(title="Australian brick production")
+```
+
+We can see that there is also seasonality, as the bricks production increases over the quarters, and start decreasing in the last quarter. We can see that there is a decreasing trend in the data. From the series we can see that the bricks production is greater over the middle of the year with respect to the start and the end. We can see that there is an unusual yar that the first half of the 80’s, as the production dropped to 300, from the 450-550 value it is supposed to be in.
+
+```{r}
+# Hare from pelt
+hare_production   <- pelt  %>%
+  #filter(Year >= 1980) %>% 
+  select(Year, Hare)
+
+autoplot(hare_production, Hare) +
+  labs(title = "Hare production")
+
+#gg_season(hare_production, Hare) +
+#  labs(title = "Hare production")
+
+gg_subseries(hare_production, Hare) +
+  labs(title = "Hare production")
+
+gg_lag(hare_production, Hare) +
+  labs(title = "Hare production")
+
+hare_production %>% ACF(Hare, lag_max = 9)
+
+hare_production %>%
+  ACF(Hare) %>%
+  autoplot() + 
+  labs(title="Hare production")
+```
+
+In this series, we only have access to yearly data, so we cannot test if there is any seasonality. Although we can see that there is cyclicity on the data, as the values grows and falls in a period of 5 years, there is also no trend during this period. The only remarkable year is in the early 60’s where the data experience the highest value in all the time series.
+
+
+
+```{r}
+# “H02” Cost from PBS
+h02_cost   <- PBS  %>%
+  filter(ATC2 == "H02") %>% #Year >= 1980
+  select(Month, Cost)  %>%
+  summarise(TotalC = sum(Cost))
+
+autoplot(h02_cost, TotalC) +
+  labs(title = "H02 cost")
+
+gg_season(h02_cost, TotalC) +
+  labs(title = "H02 cost")
+
+gg_subseries(h02_cost, TotalC) +
+  labs(title = "H02 cost")
+
+gg_lag(h02_cost, TotalC) +
+  labs(title = "H02 cost")
+
+h02_cost %>% ACF(TotalC, lag_max = 9)
+
+h02_cost %>%
+  ACF(TotalC) %>%
+  autoplot() + 
+  labs(title="H02 cost")
+```
+We can see that the series has seasonality, it starts as a time high during January, follow by a huge drop in February a slow increase over the rest of the year forward the January values. We can also see that there is no cyclicity, and the general trend is increasing, it is interesting the huge drop on the beginning of the year, this can be related to how medicine is administered in the USA (I’m not so familiarize with how this works). There is no unusual year on the time series.
+
+
+```{r}
+# “H02” Cost from PBS
+us_Barrels   <- us_gasoline  #%>%
+  #filter(ATC2 == "H02") %>% #Year >= 1980
+  #select(Month, Cost)  %>%
+  #summarise(TotalC = sum(Cost))
+
+autoplot(us_Barrels, Barrels) +
+  labs(title = "US Gasoline Barrels")
+
+gg_season(us_Barrels, Barrels) +
+  labs(title = "US Gasoline Barrels")
+
+gg_subseries(us_Barrels, Barrels) +
+  labs(title = "US Gasoline Barrels")
+
+gg_lag(us_Barrels, Barrels) +
+  labs(title = "US Gasoline Barrels")
+
+us_Barrels %>% ACF(Barrels, lag_max = 9)
+
+us_Barrels %>%
+  ACF(Barrels) %>%
+  autoplot() + 
+  labs(title="US Gasoline Barrels")
+```
+In this case there seems to be some seasonality, although it is not extremely clear, we can see, that the barrels increase over the weeks, and then decrease over the end of the year. There is no cyclicity, and there is a positive trend, we can see that the number of barrels increase over time, although in the last part of the series the values stabilize, and the growing pattern dis smaller. There is no unusual year on the series.
+
+
+
+# **3.7 exercises 9**
+a)
+Here we can see an increasing time series, we can clearly see that the trend is positive in every year. If we take a look at the seasonality of the time series, we can find that there is a seasonal component, in this case is follows a complex path of increasing in values during the firsts months of the year, followed by a decrease until the month of august, where it reaches a time low, then in increase in September, followed by another fall during October and November, and finally in ends at the highest value during the last month of the year in September.
+b)
+The recession during 1991/1992 is visible under the remainder component of the decomposition, as we can see a huge drop during that time period, while the normal residual is close to cero, and with a deviation no greater than 100, during that period it drop to -400
+
+
+# **3.7 exercises 10**
+```{r}
+# “Total Private” Employed from us_employment
+can_gas  <- canadian_gas  #%>%
+  #filter(Title == "Total Private" & year(Month) >= 1980) %>%
+  #select(Month, Employed)
+
+```
+
+**a)** Plot the data using autoplot(), gg_subseries() and gg_season() to look at the effect of the changing seasonality over time.
+```{r}
+
+
+autoplot(can_gas, Volume) +
+  labs(title = "Can Gas")
+
+gg_season(can_gas, Volume) +
+  labs(title = "Can Gas")
+
+gg_subseries(can_gas, Volume) +
+  labs(title = "Can Gas")
+```
+We can see there is seasonality, as the values start high at the biggening of the first month of the year, and slowly drop over the month, until the month of June, after that the values start increasing towards the end of the year, this pattern is similar over all the years.
+
+**b)** Do an STL decomposition of the data. You will need to choose a seasonal window to allow for the changing shape of the seasonal component.
+```{r}
+can_gas %>%
+  model(
+    STL(Volume ~ trend(window = 7) +
+                   season(window = 13),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+```
+We can see that the seasonal component starts to increase over the years until it achieves a higher peak in the mid 80’s, after then it starts decreasing.
+
+**c)** How does the seasonal shape change over time? [Hint: Try plotting the seasonal component using gg_season().]
+```{r}
+gg_season(can_gas, Volume) +
+  labs(title = "Can Gas")
+```
+We can see that the seasonal component start to get noisier as time advances, at the beginning it was a simple curve, while the last years it had way more jumps and Sharpe edges.
+
+
+**d)** Can you produce a plausible seasonally adjusted series?
+
+
+```{r}
+x11_dcmp <- can_gas %>%
+  model(x11 = X_13ARIMA_SEATS(Volume ~ x11())) %>%
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+    "Decomposition (x11) of Canadian Gas Volume")
+
+x11_dcmp %>%
+  ggplot(aes(x = Month)) +
+  geom_line(aes(y = Volume, colour = "Data")) +
+  geom_line(aes(y = season_adjust,
+                colour = "Seasonally Adjusted")) +
+  geom_line(aes(y = trend, colour = "Trend")) +
+  labs(y = "Volume",
+       title = "x11 Canadian Gas Volume") +
+  scale_colour_manual(
+    values = c("gray", "#0072B2", "#D55E00"),
+    breaks = c("Data", "Seasonally Adjusted", "Trend")
+  )
+```
+```{r}
+x11_dcmp_seats <- can_gas %>%
+  model(seats = X_13ARIMA_SEATS(Volume ~ seats())) %>%
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+    "Decomposition (Seats) of Canadian Gas Volume")
+```
+**e)** Compare the results with those obtained using SEATS and X-11. How are they different?
+If we take a look at the results, they are pretty much identical, between X-11 and SEATS method
+
+
+
+# **4.6 exercise 1**
+```{r}
+pbs_mean <- PBS %>% features(Cost, list(mean = mean)) %>%
+  arrange(desc(mean)) 
+#pbs_mean
+
+pbs_HighMean   <- PBS  %>%
+  filter(Concession == pbs_mean$Concession[1] & Type == pbs_mean$Type[1] & ATC1 == pbs_mean$ATC1[1] & ATC2 == pbs_mean$ATC2[1] ) 
+#pbs_HighMean
+
+autoplot(pbs_HighMean, Cost) +
+  labs(title = "PBS Cost of series with highest mean",
+       subtitle = paste("(", pbs_mean$Concession[1], ", ",pbs_mean$Type[1],", ",pbs_mean$ATC1[1],", ",pbs_mean$ATC2[1], ")"))
+
+
+pbs_std <- PBS %>% features(Cost, list(sd = sd)) %>%
+  filter(sd != 0) %>%
+  arrange(sd)
+#pbs_std
+
+pbs_LowestStd <- PBS  %>%
+  filter(Concession == pbs_std$Concession[1] & Type == pbs_std$Type[1] & ATC1 == pbs_std$ATC1[1] & ATC2 == pbs_std$ATC2[1] )
+#pbs_LowestStd
+
+autoplot(pbs_LowestStd, Cost) +
+  labs(title = "PBS Cost of series with Lowest Std",
+       subtitle = paste("(", pbs_std$Concession[1], ", ",pbs_std$Type[1],", ",pbs_std$ATC1[1],", ",pbs_std$ATC2[1], ")"))
+
+```
+
+
+# **4.6 exercise 2**
+```{r}
+tourism %>%
+  filter(Purpose == "Holiday")
+```
+
+```{r}
+tourism_features <- tourism %>%
+  #filter(Purpose == "Holiday")%>%
+  features(Trips, feat_stl)
+
+tourism_features %>%
+  filter(Purpose == "Holiday") %>%
+  select_at(vars(contains("season"), State)) %>%
+  mutate(
+    seasonal_peak_year = seasonal_peak_year +
+      4*(seasonal_peak_year==0),
+    seasonal_trough_year = seasonal_trough_year +
+      4*(seasonal_trough_year==0),
+    seasonal_peak_year = glue("Q{seasonal_peak_year}"),
+    seasonal_trough_year = glue("Q{seasonal_trough_year}"),
+  ) %>%
+  GGally::ggpairs(mapping = aes(colour = State)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+We can see that the peak quarter for each state is:
+ACT: Q1
+New South Wales: Q1
+Northern Territory: Q3
+Queensland: Q3
+South Australia: Q1
+Tasmania: Q1
+Victoria: Q1
+Western Australia: Q1
+
+
+# **4.6 exercise 3**
+```{r}
+PBS_features <- PBS %>%
+  #filter(Purpose == "Holiday")%>%
+  features(Cost, feat_stl)
+PBS_features
+
+
+PBS_features %>%
+  select_at(vars(contains("season"))) %>%
+  mutate(
+    seasonal_peak_year = seasonal_peak_year +
+      4*(seasonal_peak_year==0),
+    seasonal_trough_year = seasonal_trough_year +
+      4*(seasonal_trough_year==0),
+    seasonal_peak_year = glue("Q{seasonal_peak_year}"),
+    seasonal_trough_year = glue("Q{seasonal_trough_year}"),
+  ) %>%
+  GGally::ggpairs(mapping = aes()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+# **5.11 exercises 9**
+**a)** Create a training set for household wealth (hh_budget) by withholding the last four years as a test set.
+```{r}
+hh_budget
+train <- hh_budget %>%
+  filter(Year <= 2012 & Country=="USA") #& Country=="__" | Australia, Canada, Japan, USA 
+train
+
+```
+
+**b)** Fit all the appropriate benchmark methods to the training set and forecast the periods covered by the test set.
+```{r}
+# Fit the models
+budget_fit <- train %>%
+  model(
+    Mean = MEAN(Wealth),
+    `Naïve` = NAIVE(Wealth),
+    Drift = RW(Wealth ~ drift())
+  )
+
+# Generate forecasts for 14 quarters
+budget_fc <- budget_fit %>% forecast(h = 4)
+
+#Plot
+budget_fc %>%
+  autoplot(hh_budget,level = NULL) +
+  labs(y = "$US",
+       title = "household Wealth USA",
+       subtitle = "(1995 - 2013) + 4 year forecast") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+**c)** Compute the accuracy of your forecasts. Which method does best?
+```{r}
+
+accuracy(budget_fc, hh_budget)
+```
+Drift method achieve better metrics than the other methods
+
+
+**d)** Do the residuals from the best method resemble white noise?
+```{r}
+train %>%
+  model(Drift = RW(Wealth ~ drift())) %>%
+  gg_tsresiduals() +
+  labs(title = "Residuals from the Drift method")
+```
+Yes, they resemble white noise, as they are concentrated close to the 0 value, although they seam to be a little skewed to the positive size. From the ACF of the residuals we can see that there is no correlation, meaning that the forecast is good.
+
+
+# **5.11 exercises 10**
+
+**a)** Create a training set for Australian takeaway food turnover (aus_retail) by withholding the last four years as a test set.
+```{r}
+#aus_retail
+test_set <- aus_retail %>%
+  filter(Industry=="Takeaway food services") %>% 
+  summarise(AVGTurnover = mean(Turnover))
+test_set
+
+train <- test_set %>%
+  filter(year(Month) <= 2014)
+
+train
+
+```
+**b)** Fit all the appropriate benchmark methods to the training set and forecast the periods covered by the test set.
+```{r}
+# Fit the models
+retail_fit <- train %>%
+  model(
+    Mean = MEAN(AVGTurnover),
+    `Naïve` = NAIVE(AVGTurnover),
+    Drift = RW(AVGTurnover ~ drift())
+  )
+
+# Generate forecasts for 14 quarters
+retail_fc <- retail_fit %>% forecast(h = 48) # 4*12
+
+#Plot
+retail_fc %>%
+  autoplot(test_set,level = NULL) +
+  labs(y = "$US",
+       title = " Australian takeaway food turnover",
+       subtitle = "(1982 abr. - 2014 dic.	) + 4 year forecast") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+**c)** Compute the accuracy of your forecasts. Which method does best?
+```{r}
+
+accuracy(retail_fc, test_set)
+```
+Naïve method achieve better metrics than the other methods
+
+
+**d)** Do the residuals from the best method resemble white noise?
+```{r}
+test_set %>%
+  model(Drift = RW(AVGTurnover ~ drift())) %>%
+  gg_tsresiduals() +
+  labs(title = "Residuals from the Naïve method")
+```
+In this case we can see that the residuals increase over time, although they are grouped by the 0 value, and they resemble a normal distribution. From the ACF of the residuals we can see that there is correlation in multiple values, which means that the model hasn’t capture all the information, this is because the naïve model doesn’t capture the seasonality of the data.
+
+
+# **5.11 exercises 11**
+```{r}
+bricks_aus_production   <- aus_production  %>%
+  select(Quarter, Bricks) %>% 
+  drop_na()
+bricks_aus_production
+```
+
+
+**a)** Use an STL decomposition to calculate the trend-cycle and seasonal indices. (Experiment with having fixed or changing seasonality.)
+
+```{r}
+dcmp <- bricks_aus_production %>%
+  model(
+    STL(Bricks ~ season(window = 13) #"periodic"
+    )) %>%
+  components() 
+
+autoplot(dcmp) +
+  labs(title = "STL decomposition ",
+       subtitle = "(season window: 13)")
+
+dcmp <- bricks_aus_production %>%
+  model(
+    STL(Bricks ~ season(window = 25) #"periodic"
+    )) %>%
+  components() 
+
+autoplot(dcmp) +
+  labs(title = "STL decomposition ",
+       subtitle = "(season window: 25)")
+
+dcmp <- bricks_aus_production %>%
+  model(
+    STL(Bricks ~ season(window = "periodic") #, robust = TRUE
+  )) %>%
+  components() 
+
+autoplot(dcmp) +
+  labs(title = "STL decomposition ",
+       subtitle = "(season window: periodic)")
+```
+
+
+**b)** Compute and plot the seasonally adjusted data.
+```{r}
+dcmp %>%
+  as_tsibble() %>%
+  autoplot(Bricks, colour="gray") +
+  geom_line(aes(y=season_adjust), colour = "#D55E00") +
+  labs(title = "Australian Bricks Production")
+```
+
+**c)** Use a naïve method to produce forecasts of the seasonally adjusted data.
+```{r}
+dcmp2 <- dcmp %>%
+  select(-.model)
+
+bricks_fit <- dcmp2 %>%
+  model(NAIVE(season_adjust))
+
+
+# Generate forecasts for 32 quarters
+bricks_fc <- bricks_fit %>% forecast(h = 32) # 4*12
+
+
+#Plot
+bricks_fc %>%
+  autoplot(dcmp2,level = NULL) +
+  labs(y = "$US",
+       title = "Australian Bricks season_adjust") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+
+**d)** Use decomposition_model() to reseasonalise the results, giving forecasts for the original data.
+```{r}
+fit_dcmp <- bricks_aus_production %>%
+  model(stlf = decomposition_model(
+    STL(Bricks ~ season(window = "periodic")), #, robust = TRUE
+    NAIVE(season_adjust)
+  ))
+fit_dcmp %>%
+  forecast() %>%
+  autoplot(bricks_aus_production)+
+  labs(title = "Australian Bricks")
+```
+
+**e)** Do the residuals look uncorrelated?
+```{r}
+fit_dcmp %>% gg_tsresiduals()
+```
+There are values lags for which the residuals are correlated, meaning that there is still information remaining on the residuals.
+
+
+**f)** Repeat with a robust STL decomposition. Does it make much difference?
+```{r}
+dcmp <- bricks_aus_production %>%
+  model(
+    STL(Bricks ~ season(window = "periodic"), #"periodic"
+    robust = TRUE)) %>%
+  components() 
+
+autoplot(dcmp) +
+  labs(title = "STL decomposition ",
+       subtitle = "(season window: periodic)")
+
+dcmp %>%
+  as_tsibble() %>%
+  autoplot(Bricks, colour="gray") +
+  geom_line(aes(y=season_adjust), colour = "#D55E00") +
+  labs(title = "Australian Bricks Production")
+
+dcmp2 <- dcmp %>%
+  select(-.model)
+
+bricks_fit <- dcmp2 %>%
+  model(NAIVE(season_adjust))
+
+
+# Generate forecasts for 32 quarters
+bricks_fc <- bricks_fit %>% forecast(h = 32) # 4*12
+
+fit_dcmp <- bricks_aus_production %>%
+  model(stlf = decomposition_model(
+    STL(Bricks ~ season(window = "periodic"), robust = TRUE), #, robust = TRUE
+    NAIVE(season_adjust)
+  ))
+fit_dcmp %>%
+  forecast() %>%
+  autoplot(bricks_aus_production)+
+  labs(title = "Australian Bricks")
+
+fit_dcmp %>% gg_tsresiduals()
+```
+There looks like there isn’t much difference, But we can see that the residuals are less spread in the Robust STL than in the normal one, which means that is has capture more information.
+
+
+
+
+**g)** Compare forecasts from decomposition_model() with those from SNAIVE(), using a test set comprising the last 2 years of data. Which is better?
+```{r}
+bricks_train <-bricks_aus_production %>%
+  filter(year(Quarter) <= 2002)
+bricks_train
+
+bricks_fit <- bricks_train %>%
+  model(
+    `Seasonal naïve` = SNAIVE(Bricks),
+    stlf = decomposition_model(
+      STL(Bricks ~ season(window = "periodic"), robust = TRUE), #, robust = TRUE
+      NAIVE(season_adjust))
+  )
+
+bricks_fc <- bricks_fit %>%
+  forecast(h = 10)
+
+
+bricks_fc %>%
+  autoplot(
+    bricks_aus_production,
+    level = NULL
+  ) +
+  labs(title = "Forecasts for Australian Bricks") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+accuracy(bricks_fc, bricks_aus_production)
+```
+It looks like the decomposition_model achive better metrics that the SNAIVE method in all the metrics and in the graph
+
+
+# **5.11 exercises 12**
+
+**a)** Extract data from the Gold Coast region using filter() and aggregate total overnight trips (sum over Purpose) using summarise(). Call this new dataset gc_tourism.
+```{r}
+tourism
+gc_tourism <- tourism %>%
+  filter(Region == "Gold Coast") %>%
+  #group_by(Purpose) %>%
+  summarise(TotalTrips = sum(Trips)) #%>%
+  #select(Quarter, Purpose, TotalTrips)
+gc_tourism
+```
+
+
+**b)** Using slice() or filter(), create three training sets for this data excluding the last 1, 2 and 3 years. For example, gc_train_1 <- gc_tourism %>% slice(1:(n()-4)).
+```{r}
+gc_train_1 <- gc_tourism %>% slice(1:(n()-4))
+gc_train_1
+
+gc_train_2 <- gc_tourism %>% slice(1:(n()-8))
+gc_train_2
+
+gc_train_3 <- gc_tourism %>% slice(1:(n()-12))
+gc_train_3
+
+
+gc_test_1 <- gc_tourism %>% slice((n()-4+1):(n()))
+gc_test_1
+
+gc_test_2 <- gc_tourism %>% slice((n()-8+1):(n()-4))
+gc_test_2
+
+gc_test_3 <- gc_tourism %>% slice((n()-12+1):(n()-8))
+gc_test_3
+```
+
+
+**c)**Compute one year of forecasts for each training set using the seasonal naïve (SNAIVE()) method. Call these gc_fc_1, gc_fc_2 and gc_fc_3, respectively.
+```{r}
+gc_fit_1 <- gc_train_1 %>%
+  model(SNAIVE(TotalTrips)) 
+# Generate forecasts for 4 quarters
+gc_fc_1 <- gc_fit_1 %>% forecast(h = 4)
+
+
+gc_fit_2 <- gc_train_2 %>%
+  model(SNAIVE(TotalTrips)) 
+# Generate forecasts for 4 quarters
+gc_fc_2 <- gc_fit_2 %>% forecast(h = 4)
+
+
+gc_fit_3 <- gc_train_3 %>%
+  model(SNAIVE(TotalTrips)) 
+# Generate forecasts for 4 quarters
+gc_fc_3 <- gc_fit_3 %>% forecast(h = 4)
+
+```
+
+**d)**Use accuracy() to compare the test set forecast accuracy using MAPE. Comment on these.
+```{r}
+accuracy(gc_fc_1, gc_test_1)
+accuracy(gc_fc_2, gc_test_2)
+accuracy(gc_fc_3, gc_test_3)
+```
+If we take a look at the accuracy using MAPE, we can see that for the model 2 was the lowest value at 4.320729, follow by the model 3 at 9.067368, while model 1 got the highest value at 15.06055.
+
+

@@ -1,0 +1,827 @@
+---
+title: "Week 6 homework 2_Alex_C_Parra"
+author: "Alex Parra"
+date: "29/6/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tsibble)
+library(fpp3)
+```
+
+# **7.10 exercise 1**
+```{r}
+jan14_vic_elec <- vic_elec %>%
+  filter(yearmonth(Time) == yearmonth("2014 Jan")) %>%
+  index_by(Date = as_date(Time)) %>%
+  summarise(
+    Demand = sum(Demand),
+    Temperature = max(Temperature)
+  )
+jan14_vic_elec
+```
+
+
+**a)**
+```{r}
+jan14_vic_elec %>% autoplot(Demand) + labs(title = "Demand")
+jan14_vic_elec %>% autoplot(Temperature) + labs(title = "Temperature")
+
+#model
+fit <- jan14_vic_elec %>%
+  model(demand_temp = TSLM(Demand ~ Temperature))
+
+
+augment(fit) %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = Demand, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+    title = "Electricity demand for Victoria, Australia", subtitle = "(2014 - 2014)") +
+  scale_colour_manual(values=c(Data="black",Fitted="#D55E00")) +
+  guides(colour = guide_legend(title = NULL))
+
+```
+There is a positive relation because people increase their demand for electricity as temperature raises, since they turn on AC in order to cool the room or house.
+
+**b)**
+```{r}
+fit %>% gg_tsresiduals()
+```
+We can see that the residuals seem to be slightly skewed to the positives value, there also seems to be some outliers on the negative size at the biggening and in the last January. We can see that there isn’t any lag on the autocorrelation plot.
+
+**c)**
+```{r}
+jan14_vic_elec %>%
+  model(TSLM(Demand ~ Temperature)) %>%
+  forecast(
+    new_data(jan14_vic_elec, 1) %>%
+      mutate(Temperature = 15)
+  ) %>%
+  autoplot(jan14_vic_elec)
+jan14_vic_elec %>%
+  model(TSLM(Demand ~ Temperature)) %>%
+  forecast(
+    new_data(jan14_vic_elec, 1) %>%
+      mutate(Temperature = 35)
+  ) %>%
+  autoplot(jan14_vic_elec)
+```
+We have seen that there is a relationship between Temperature and Electricity Demand, that means that if the temperature for the next day is 15 or 35 degrees it will drive up or down the demand. But we have to take into consideration that at no point in the time series there is a temperature of 15 ºC, this means that we do not know if the relation between the variables holds outside the data that the model is train with. 
+
+
+**d)**
+```{r}
+fc <- fit %>%
+  forecast(jan14_vic_elec)
+
+fc %>%
+  autoplot(jan14_vic_elec) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(title = "Electricity demand for Victoria, Australia", subtitle = "(2014 - 2014)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+**e)**
+```{r}
+jan14_vic_elec %>%
+  ggplot(aes(x = Temperature, y = Demand)) +
+  labs(y = "Demand",
+       x = "Temperature") +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+We can see that there is a positive relation between Demand and Temperature. As temperature increases the demand for electricity goes up.
+
+```{r}
+augment(fit)
+
+```
+
+
+# **7.10 exercise 2**
+```{r}
+olympic_running
+
+
+
+autoplot(olympic_running)
+
+```
+
+**b)**
+```{r}
+fit <- olympic_running %>%
+  model(time = TSLM(Time ~ Year))
+print('')
+print('###########################################################')
+print('########################## 100 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 100) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 100) %>%
+  report()
+print('')
+print('###########################################################')
+print('########################## 200 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 200) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 200) %>%
+  report()
+print('')
+print('###########################################################')
+print('########################## 400 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 400) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 400) %>%
+  report()
+print('')
+print('###########################################################')
+print('########################## 800 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 800) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 800) %>%
+  report()
+print('')
+print('###########################################################')
+print('######################### 1500 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 1500) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 1500) %>%
+  report()
+print('')
+print('###########################################################')
+print('######################### 5000 m ##########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 5000) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 5000) %>%
+  report()
+print('')
+print('###########################################################')
+print('######################### 10000 m #########################')
+print('###########################################################')
+print('')
+fit %>% 
+  filter(Sex == "men" & Length== 10000) %>%
+  report()
+print('----------------------------------------------------------')
+fit %>% 
+  filter(Sex == "women" & Length== 10000) %>%
+  report()
+#report(fit)
+```
+
+We can see that the decrease in time change depending on the distance, we can see that the values are for:
+100 meters: -0.012 (men) and -0.014 (women)
+200 meters: -0.024 (men) and -0.033 (women)
+400 meters: -0.064 (men) and -0.040 (women)
+800 meters: -0.151 (men) and -0.197 (women)
+1500 meters: -0.315 (men) and 0.146 *(women)
+5000 meters: -1.029 (men) and -0.303 *(women)
+10000 meters: -2.665 (men) and -3.496 (women)
+We can see that the longer the distance the greater reduction in time we can see over the years. We can see a couple of outliers in the 1500 m for women where the times increased over the years, and in 5000 m for women where the time decrease much less than on the males, where normally the times are really close between men and women, even in most cases the women got greater reductions in time than males.
+
+**c)**
+```{r}
+residuals(fit) %>%
+  autoplot(.resid)
+```
+We can see that some models have huge errors over the years, most of those errors, we can also see that some models errors are smaller than the rest, this is probably because some models distance are way shorter 100 m vs 10,000 m meaning the time is also way different, this results in the errors of the models with shorter distances being way smaller than the others ones. 
+
+**d)**
+```{r}
+fit %>%
+  filter(Length == 100) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 200) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 400) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 800) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 1500) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 5000) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+
+fit %>%
+  filter(Length == 10000) %>%
+  forecast(
+    new_data(olympic_running, 1) %>%
+      mutate(Year = 2020)
+  ) %>%
+  autoplot(olympic_running)
+```
+This are the predictions using the year as the input variable to the model. Of course, the model is very poor, since it only takes the year, meaning that as the year goes on the time will decrease even into negative values, which makes no sense, what will probably happened is that the values will start to stabilize at some point, we can actually start to see that on some of the data.
+
+
+# **7.10 exercise 3**
+$$
+\log y=\beta_0+\beta_1 \log x + e
+$$
+
+$\beta_1=\frac{dy}{dx} * \frac{x}{y}$
+
+$\beta_1 * \frac{dx}{x} = \frac{dy}{y}$
+
+# **7.10 exercise 4**
+
+**a)**
+```{r}
+souvenirs 
+souvenirs %>%
+  autoplot()
+```
+We can see the seasonal component on the winter months for Christmas, we can also see a smaller peak in March for the surfing festival, except for 1987. Also, since the shop has been expanding we can see that the sells increase over time.
+
+**b)**
+```{r}
+
+souvenirs %>%
+  mutate(log_Sales = log(Sales)) %>%
+  autoplot(log_Sales)+ ylab("log Sales")
+```
+We can see that by taking log, the data looks more linear over time
+
+**c)**
+```{r}
+
+souvenirs %>%
+  mutate(surfing_festival = case_when(
+    (month(Month)==3 & year(Month)>=1988) ~ 1,
+    (month(Month)!=3 | year(Month)==1987) ~ 0 ) )  -> new_souvenirs
+
+fit <- new_souvenirs %>%
+  model(TSLM(log(Sales) ~ trend() + season() + surfing_festival))
+
+
+report(fit)
+```
+
+**d)**
+```{r}
+fit %>% gg_tsresiduals()
+```
+We can see that the residuals are not perfect, they are skewed to the positives size, we can also see that there are lag on the first 3 values, and then on the 10º value. Meaning that there are still some relations that we haven’t capture.
+
+**e)**
+```{r}
+
+residuals(fit) %>%
+  ggplot(aes(x = month(Month), y = .resid, group=month(Month))) +
+    geom_boxplot()
+
+```
+We can see that residuals are really similar between all months, of course we can see that some months residuals are really grouped by, like month April, June, July while others have higher dispersion.
+
+**f)**
+```{r}
+report(fit)
+```
+The trend has a positive relation, although it is a really small value compare with other ones. In the season component, we can see that the last two months have really high coefficients above 1.0, we can also see that the surfing festival  has a positive coefficients of 0.5
+
+**g)**
+```{r}
+augment(fit) %>%
+  features(.innov, ljung_box, lag = 10, dof = 0)
+```
+Since the Q* have a really high value of 69, we can say that the correlation do not come from a white noise.
+
+
+
+**h)**
+```{r}
+
+vals <- rep(0, 36)
+yyy <- rep(0, 36)
+mmm <- rep(0, 36)
+for(i in 1:36){
+  if(i %% 12 == 3){
+    vals[i] <- 1
+  }
+  yyy[i] = 1994 + as.integer((i-1)/12)
+  mmm[i] = ((i-1) %% 12) + 1
+}
+
+df <- data.frame(unlist(yyy), unlist(mmm), unlist(vals))
+names(df) <- c("year", "month", "surfing_festival")
+
+df %>%
+  mutate(Month = yearmonth(paste(year, " ", month))) %>%
+  as_tsibble(index = Month) %>%
+  select(Month,surfing_festival) -> future_data
+
+future_data
+
+fit %>%
+  forecast(future_data) %>%
+  autoplot(souvenirs)
+```
+
+**i)**
+Since we have built the model using the log transformation we can see that the predictions reflects the data really good, but other types of transformations can be tested in order to get  a better knowledge of the data
+
+# **7.10 exercise 5**
+```{r}
+us_gasoline %>%
+  filter(year(Week)<=2004) -> us_gasoline_1991_2004
+
+us_gasoline_1991_2004
+
+us_gasoline_1991_2004 %>%
+  autoplot(Barrels)
+```
+**a)**
+```{r}
+fourier2_us_gasoline_1991_2004 <- us_gasoline_1991_2004 %>%
+  model(f2 = TSLM(Barrels ~ trend() + fourier(K = 2)))
+#report(fourier2_us_gasoline_1991_2004)
+augment(fourier2_us_gasoline_1991_2004) %>%
+  ggplot(aes(x = Week)) +
+  geom_line(aes(y = Barrels, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+    title = "Weekly data for supplies of US finished motor gasoline product", 
+    subtitle = "Fourier (k=2)"  
+  ) +
+  scale_colour_manual(values=c(Data="black",Fitted="#D55E00")) +
+  guides(colour = guide_legend(title = NULL))
+
+
+
+fourier2_us_gasoline_1991_2004 <- us_gasoline_1991_2004 %>%
+  model(f2 = TSLM(Barrels ~ trend() + fourier(K = 4)))
+#report(fourier2_us_gasoline_1991_2004)
+augment(fourier2_us_gasoline_1991_2004) %>%
+  ggplot(aes(x = Week)) +
+  geom_line(aes(y = Barrels, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+    title = "Weekly data for supplies of US finished motor gasoline product", 
+    subtitle = "Fourier (k=4)"  
+  ) +
+  scale_colour_manual(values=c(Data="black",Fitted="#D55E00")) +
+  guides(colour = guide_legend(title = NULL))
+
+
+fourier2_us_gasoline_1991_2004 <- us_gasoline_1991_2004 %>%
+  model(f2 = TSLM(Barrels ~ trend() + fourier(K = 8)))
+augment(fourier2_us_gasoline_1991_2004) %>%
+  ggplot(aes(x = Week)) +
+  geom_line(aes(y = Barrels, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+    title = "Weekly data for supplies of US finished motor gasoline product", 
+    subtitle = "Fourier (k=8)"  
+  ) +
+  scale_colour_manual(values=c(Data="black",Fitted="#D55E00")) +
+  guides(colour = guide_legend(title = NULL))
+```
+We can see that as the Fourier term K increases the more detail has the fitted line, this is because the parameter k indicates the number of sines and cosines used in the Fourier series. By increasing the number of sines and cosines we can get a series with more details, and this is what we can see on the graphs.
+
+**b)**
+```{r}
+fourier_us_gasoline_1991_2004 <- us_gasoline_1991_2004 %>%
+  model(f2 = TSLM(Barrels ~ trend() + fourier(K=2)),
+        f3 = TSLM(Barrels ~ trend() + fourier(K=3)),
+        f4 = TSLM(Barrels ~ trend() + fourier(K=4)),
+        f5 = TSLM(Barrels ~ trend() + fourier(K=5)),
+        f6 = TSLM(Barrels ~ trend() + fourier(K=6)),
+        f7 = TSLM(Barrels ~ trend() + fourier(K=7)),
+        f8 = TSLM(Barrels ~ trend() + fourier(K=8)),
+        f9 = TSLM(Barrels ~ trend() + fourier(K=9)),
+        f10 = TSLM(Barrels ~ trend() + fourier(K=10)),
+        f11 = TSLM(Barrels ~ trend() + fourier(K=11)),
+        f12 = TSLM(Barrels ~ trend() + fourier(K=12)),
+        f13 = TSLM(Barrels ~ trend() + fourier(K=13)),
+        f14 = TSLM(Barrels ~ trend() + fourier(K=14)),
+        f15 = TSLM(Barrels ~ trend() + fourier(K=15)),
+        f16 = TSLM(Barrels ~ trend() + fourier(K=16)),
+        f17 = TSLM(Barrels ~ trend() + fourier(K=17)),
+        f18 = TSLM(Barrels ~ trend() + fourier(K=18)),
+        f19 = TSLM(Barrels ~ trend() + fourier(K=19)),
+        f20 = TSLM(Barrels ~ trend() + fourier(K=20)),
+        f21 = TSLM(Barrels ~ trend() + fourier(K=21)),
+        f22 = TSLM(Barrels ~ trend() + fourier(K=22)),
+        f23 = TSLM(Barrels ~ trend() + fourier(K=23)),
+        f24 = TSLM(Barrels ~ trend() + fourier(K=24)),
+        f25 = TSLM(Barrels ~ trend() + fourier(K=25)),
+        f26 = TSLM(Barrels ~ trend() + fourier(K=26)))
+
+
+
+
+glance(fourier_us_gasoline_1991_2004) %>%
+  select(.model, CV, AICc) %>%
+  arrange(AICc)
+```
+We can see that the model with the lower CV is the model with 7 Fourier terms, followed by 11, 8, 12…
+
+**c)**
+```{r}
+fourier_us_gasoline_1991_2004 %>%
+  select(f7) %>%
+  gg_tsresiduals()
+
+
+augment(fourier_us_gasoline_1991_2004) %>% 
+  features(.innov, ljung_box, lag=10, dof=5) %>%
+  filter(.model == 'f7')
+```
+We can see on the time plot the residuals over time, that the values are constant over the time around the 0 value. In the histogram we can see that it follows a normal distribution. We can see that there are some lags at 1 and 20, but just by a little bit.
+
+```{r}
+fourier_us_gasoline_1991_2004 %>%
+  select(f7) %>%
+  forecast(h = 52) -> fc_us_gasoline
+
+fc_us_gasoline
+
+fc_us_gasoline %>%
+  autoplot(us_gasoline %>% filter(year(Week)<=2005 & year(Week)>=2000) 
+           , colour = 'red') +
+  labs(title = "Weekly data for supplies of US finished motor gasoline product",
+       subtitle = "(2000 - 2015)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+We can see that the forecast represented really good the data, except for some points, the end of the prediction is wrong, as the actual data decreased way more than the prediction. But overall is a good forecast.
+
+
+
+# **8.8 exercise 1**
+```{r}
+aus_livestock %>%
+  filter(Animal == 'Pigs' & State == 'Victoria') -> aus_pigs
+
+aus_pigs
+
+aus_pigs %>%
+  autoplot(Count)
+```
+**a)**
+```{r}
+fit_aus_pigs <- aus_pigs %>%
+  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+
+report(fit_aus_pigs)
+
+fc_aus_pigs <- fit_aus_pigs %>%
+  forecast(h = 4)
+
+fc_aus_pigs %>%
+  autoplot(aus_pigs %>% filter(year(Month)>=2010))
+```
+
+**b)**
+```{r}
+aug_fit_aus_pigs <- augment(fit_aus_pigs) 
+standard_dev = sd(aug_fit_aus_pigs$.resid)
+#standard_dev
+
+mean_forecast1 = fc_aus_pigs$.mean[1]
+#mean_forecast1
+
+lower95 = mean_forecast1 - (1.96 * standard_dev)
+upper95 = mean_forecast1 + (1.96 * standard_dev)
+
+print("Our prediction interval: ")
+print(paste0("Lower Interval (95%): ", lower95))
+print(paste0("Upper Interval (95%): ", upper95))
+
+print("-------------------------")
+print("Prediction interval by R: ")
+
+fc_aus_pigs%>%
+  hilo() %>%
+  filter(month(Month)==1) %>% #Get the first prediction
+  select(Animal, State, .model, Month, "95%") -> r_95_interval
+
+r_95_interval$"95%"
+```
+We can see that the intervals are not the same. They are similar in the first 3 digits, but after that point they are different. This is because R uses a more precise method than the one, we applied. We used 1.96 but this is just an approximation of the real value. 
+
+
+# **8.8 exercise 2**
+```{r}
+my_function <- function(y, alpha, level) {
+  count=1
+  predictions=c()
+  for (y_i in y){
+    if(count==1){
+      #First Iter
+      
+      # Calculate value
+      y_i_1 = alpha * y_i + (1-alpha) * level 
+      # save value
+      predictions <- append(predictions, c(y_i_1))
+    }else{
+      #Not First Iter
+      
+      # Calculate value
+      y_i_1 = alpha * y_i + (1-alpha) * y_i_1
+      # save value
+      predictions <- append(predictions, c(y_i_1))
+    }
+    count = count+1
+  }
+  #print(predictions)
+  return(predictions[length(predictions)])
+}
+
+#yy = c(1, 2, 3, 4, 5)
+my_function(aus_pigs$Count, 0.3221247, 100646.6)
+
+
+(fc_aus_pigs %>%
+  filter(month(Month)==1))$.mean
+```
+We can see that both values are the same, meaning that that the function worked.
+
+
+
+# **8.8 exercise 3**
+```{r}
+my_function2 <- function(pars = c(alpha, level), y) {
+  alpha = pars[1]
+  level = pars[2]
+  
+  count=1
+  predictions=c()
+  SSE = 0
+  squared_errors=c()
+  for (y_i in y){
+    if(count==1){
+      #First Iter
+      
+      # Calculate value
+      y_i_1 = alpha * y_i + (1-alpha) * level 
+      # save value
+      predictions <- append(predictions, c(y_i_1))
+    }else{
+      #Not First Iter
+      
+      squared_error = (y_i-y_i_1)^2
+      squared_errors <- append(squared_errors, c(squared_error))
+      SSE = SSE + squared_error
+      
+      # Calculate value
+      y_i_1 = alpha * y_i + (1-alpha) * y_i_1
+      # save value
+      predictions <- append(predictions, c(y_i_1))
+      
+      
+      
+    }
+    count = count+1
+  }
+  #print(predictions)
+  return(SSE)
+}
+
+sum_squared_errors_res = my_function2( c(0.3221247, 100646.6), aus_pigs$Count)
+sum_squared_errors_res
+
+response = optim( par = c(0.5, 100), y = aus_pigs$Count, fn=my_function2)
+```
+```{r}
+
+al = response$par[1]
+lev = response$par[2]
+print(paste0("optimized Alpha: ",al))
+print(paste0("optimized level: ",lev))
+print("--------------------------------")
+print(paste0("True Alpha: ",0.3221247))
+print(paste0("True level: ",100646.6))
+```
+We can see that the values are really close by, and they start to differ after 3 digits
+
+
+
+# **8.8 exercise 4**
+```{r}
+my_function3 <- function(y) {
+  #optimize
+  response = optim( par = c(0.5, 100), y = y, fn=my_function2)
+  alpha = response$par[1]
+  level = response$par[2]
+  
+  #predict
+  prediction = my_function(y, alpha, level)
+  
+  return(prediction)
+}
+
+print("My function: ")
+my_function3(aus_pigs$Count)
+
+print("Prediction from R: ")
+(fc_aus_pigs %>%
+  filter(month(Month)==1))$.mean
+```
+
+# **8.8 exercise 5**
+```{r}
+global_economy %>%
+  filter(Country == "Spain") ->spain
+spain
+```
+
+
+
+**a)**
+```{r}
+
+spain %>%
+  autoplot(Exports)
+```
+We can see a positive trend, meaning that the values keep rising as the years goes on. We also can see raises and falls over the years in a somewhat cyclic pattern.
+
+**b)**
+```{r}
+fit_spain <- spain %>%
+  model(ANN = ETS(Exports ~error("A") + trend("N") + season("N")))
+
+fc_spain <- fit_spain %>%
+  forecast(h=10)
+
+fc_spain %>%
+  autoplot(spain)
+
+
+```
+
+**c)**
+```{r}
+accuracy(fit_spain)
+```
+RMSE value: 1.298316
+
+
+**d)**
+```{r}
+fit_spain <- spain %>%
+  model(AAN = ETS(Exports ~error("A") + trend("A") + season("N")))
+
+fc_spain <- fit_spain %>%
+  forecast(h=10)
+
+fc_spain %>%
+  autoplot(spain)
+
+accuracy(fit_spain)
+```
+We can see that the RMSE for the AAN is 1.222947 while for the ANN is 1.298316, this is an increase of more than 6% from the AAN to ANN. The AAN method was able to capture the upward trend of the data, while the AAN was just a flat prediction. This is expected since the AAN incorporate the trend parameter.
+
+
+**e)**
+```{r}
+fit_spain <- spain %>%
+  model(
+    ANN = ETS(Exports ~error("A") + trend("N") + season("N")),
+    AAN = ETS(Exports ~error("A") + trend("A") + season("N"))
+  )
+
+fc_spain <- fit_spain %>%
+  forecast(h=10)
+
+fc_spain %>%
+  autoplot(spain, level=NULL) +
+  labs(title = "Spanish Exports",
+       subtitle = "(1960 - 2017) + 10 year forecast") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+The forecast from the AAN is probably better since it was able to capture the upward trend of the dataset. Having said this if the next years would behave like the downward part of the cycle the ANN method will probably perform best, since it is flat, but this will only hold while the cycle is downward, once it starts to increase the AAN will again perform better.
+
+**f)**
+```{r}
+# ANN model:
+print("#######################################")
+print("################# ANN #################")
+print("#######################################")
+#mean
+ANN_mean = (fc_spain %>% filter(.model=='ANN'))$.mean[1]
+
+#standard dev of residuals
+ANN_standard_dev = sd((augment(fit_spain)%>% filter(.model=='ANN'))$.resid)
+
+lower95 = ANN_mean - (1.96 * ANN_standard_dev)
+upper95 = ANN_mean + (1.96 * ANN_standard_dev)
+
+print("Our prediction interval (ANN): ")
+print(paste0("Lower Interval (95%): ", lower95))
+print(paste0("Upper Interval (95%): ", upper95))
+
+print("-------------------------")
+print("Prediction interval by R (ANN): ")
+
+fc_spain %>% 
+  filter(.model=='ANN') %>%
+  hilo() %>%
+  filter(Year==2018) %>% #Get the first prediction
+  select(Country, .model, Year, "95%") -> r_95_interval
+
+print(paste0("Interval (95%): ", r_95_interval$"95%"))
+#r_95_interval$"95%"
+
+
+
+# AAN model:
+print("#######################################")
+print("################# AAN #################")
+print("#######################################")
+#mean
+ANN_mean = (fc_spain %>% filter(.model=='AAN'))$.mean[1]
+
+#standard dev of residuals
+ANN_standard_dev = sd((augment(fit_spain)%>% filter(.model=='AAN'))$.resid)
+
+lower95 = ANN_mean - (1.96 * ANN_standard_dev)
+upper95 = ANN_mean + (1.96 * ANN_standard_dev)
+
+print("Our prediction interval (AAN): ")
+print(paste0("Lower Interval (95%): ", lower95))
+print(paste0("Upper Interval (95%): ", upper95))
+
+print("-------------------------")
+print("Prediction interval by R (AAN): ")
+
+fc_spain %>% 
+  filter(.model=='AAN') %>%
+  hilo() %>%
+  filter(Year==2018) %>% #Get the first prediction
+  select(Country, .model, Year, "95%") -> r_95_interval
+
+print(paste0("Interval (95%): ", r_95_interval$"95%"))
+#r_95_interval$"95%"
+```
+We can see that the intervals are similar but not the same, we can see that the first 2 digits are the same, while the decimal part starts to differ.
